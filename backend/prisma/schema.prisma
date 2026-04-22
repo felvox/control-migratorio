@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMINISTRADOR
+  OPERADOR
+  CONSULTA
+}
+
+enum TipoControl {
+  INGRESO
+  EGRESO
+  TERRITORIO
+}
+
+enum TipoPersona {
+  PRINCIPAL
+  ACOMPANANTE
+  MENOR
+}
+
+enum EstadoCaso {
+  PENDIENTE
+  DERIVADO_CARABINEROS
+  DERIVADO_PDI
+  CERRADO
+}
+
+enum TipoEvidencia {
+  FOTO_PERSONA
+  DOCUMENTO_IDENTIDAD
+  ADJUNTO_GENERAL
+}
+
+enum InstitucionDerivacion {
+  NINGUNA
+  CARABINEROS
+  PDI
+}
+
+model Usuario {
+  id                        String              @id @default(uuid())
+  run                       String              @unique
+  email                     String?             @unique
+  nombreCompleto            String
+  passwordHash              String
+  rol                       Role
+  activo                    Boolean             @default(true)
+  eliminadoAt               DateTime?
+  creadoAt                  DateTime            @default(now())
+  actualizadoAt             DateTime            @updatedAt
+  casosCreados              Caso[]              @relation("CasoCreadoPor")
+  casosActualizados         Caso[]              @relation("CasoActualizadoPor")
+  personasCreadas           Persona[]           @relation("PersonaCreadaPor")
+  evidenciasCreadas         Evidencia[]         @relation("EvidenciaCreadaPor")
+  documentosGenerados       DocumentoGenerado[] @relation("DocumentoGeneradoPor")
+  auditorias                Auditoria[]
+  sesiones                  SesionAcceso[]
+
+  @@index([rol])
+  @@index([activo])
+}
+
+model Caso {
+  id                       String                @id @default(uuid())
+  codigo                   String                @unique
+  tipoControl              TipoControl
+  fechaHoraProcedimiento   DateTime
+  lugar                    String
+  coordenadas              String?
+  fechaIngreso             DateTime?
+  documentado              Boolean               @default(false)
+  estadoSalud              String?
+  observaciones            String?
+  vieneAcompanado          Boolean               @default(false)
+  existenMenores           Boolean               @default(false)
+  institucionDerivacion    InstitucionDerivacion @default(NINGUNA)
+  estado                   EstadoCaso            @default(PENDIENTE)
+  creadoPorId              String
+  actualizadoPorId         String?
+  creadoAt                 DateTime              @default(now())
+  actualizadoAt            DateTime              @updatedAt
+  eliminadoAt              DateTime?
+  creadoPor                Usuario               @relation("CasoCreadoPor", fields: [creadoPorId], references: [id])
+  actualizadoPor           Usuario?              @relation("CasoActualizadoPor", fields: [actualizadoPorId], references: [id])
+  personas                 Persona[]
+  evidencias               Evidencia[]
+  documentos               DocumentoGenerado[]
+  auditorias               Auditoria[]           @relation("CasoAuditoria")
+
+  @@index([fechaHoraProcedimiento])
+  @@index([estado])
+  @@index([lugar])
+}
+
+model Persona {
+  id              String      @id @default(uuid())
+  casoId          String
+  tipoPersona     TipoPersona
+  nombres         String
+  apellidos       String
+  nacionalidad    String
+  fechaNacimiento DateTime
+  edad            Int
+  lugarNacimiento String?
+  numeroDocumento String
+  profesionOficio String?
+  estadoCivil     String?
+  domicilio       String?
+  correo          String?
+  telefono        String?
+  creadoPorId     String?
+  creadoAt        DateTime    @default(now())
+  actualizadoAt   DateTime    @updatedAt
+  caso            Caso        @relation(fields: [casoId], references: [id])
+  creadoPor       Usuario?    @relation("PersonaCreadaPor", fields: [creadoPorId], references: [id])
+  evidencias      Evidencia[]
+
+  @@index([casoId])
+  @@index([numeroDocumento])
+  @@index([nombres, apellidos])
+}
+
+model Evidencia {
+  id            String        @id @default(uuid())
+  casoId        String
+  personaId     String?
+  tipoEvidencia TipoEvidencia
+  nombreOriginal String
+  nombreGuardado String
+  rutaArchivo    String
+  mimeType       String
+  tamanoBytes    Int
+  creadoPorId    String
+  creadoAt       DateTime     @default(now())
+  caso           Caso         @relation(fields: [casoId], references: [id])
+  persona        Persona?     @relation(fields: [personaId], references: [id])
+  creadoPor      Usuario      @relation("EvidenciaCreadaPor", fields: [creadoPorId], references: [id])
+
+  @@index([casoId])
+  @@index([personaId])
+  @@index([tipoEvidencia])
+}
+
+model DocumentoGenerado {
+  id             String   @id @default(uuid())
+  casoId         String
+  tipo           String
+  nombreOriginal String
+  nombreGuardado String
+  rutaArchivo    String
+  mimeType       String
+  tamanoBytes    Int
+  creadoPorId    String
+  creadoAt       DateTime @default(now())
+  caso           Caso     @relation(fields: [casoId], references: [id])
+  creadoPor      Usuario  @relation("DocumentoGeneradoPor", fields: [creadoPorId], references: [id])
+
+  @@index([casoId])
+  @@index([tipo])
+}
+
+model Auditoria {
+  id          String   @id @default(uuid())
+  usuarioId   String?
+  casoId      String?
+  accion      String
+  entidad     String
+  entidadId   String?
+  descripcion String?
+  metadata    Json?
+  fechaHora   DateTime @default(now())
+  ip          String?
+  userAgent   String?
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id])
+  caso        Caso?    @relation("CasoAuditoria", fields: [casoId], references: [id])
+
+  @@index([fechaHora])
+  @@index([accion])
+  @@index([entidad, entidadId])
+  @@index([usuarioId])
+}
+
+model SesionAcceso {
+  id           String    @id @default(uuid())
+  usuarioId    String
+  inicioSesion DateTime  @default(now())
+  cierreSesion DateTime?
+  ip           String?
+  userAgent    String?
+  usuario      Usuario   @relation(fields: [usuarioId], references: [id])
+
+  @@index([inicioSesion])
+  @@index([usuarioId])
+}
