@@ -13,6 +13,9 @@ control-migratorio/
   docker-compose.yml
 ```
 
+Guía para revisión en Windows (jefe de proyecto):
+- [docs/guia-jefe-windows.md](docs/guia-jefe-windows.md)
+
 ## Requisitos
 - Node.js 20+
 - npm 10+
@@ -32,12 +35,28 @@ O en macOS (doble clic):
 ./levantar_sistema.command
 ```
 
+En Windows (PowerShell):
+
+```powershell
+.\levantar_sistema.ps1
+```
+
+En Windows (doble clic):
+
+- `levantar_sistema_windows.bat`
+
 Este comando hace todo automáticamente:
 - levanta PostgreSQL con Docker
 - instala dependencias faltantes
 - ejecuta `prisma generate`, migraciones (`prisma deploy`) y seed
 - levanta backend y frontend
-- abre Google Chrome en `http://localhost:4200`
+- abre Google Chrome en `http://127.0.0.1:4200/login`
+
+Detener sistema:
+
+- macOS/Linux: `./detener_sistema.sh`
+- Windows PowerShell: `.\detener_sistema.ps1`
+- Windows doble clic: `detener_sistema_windows.bat`
 
 ## 1) Levantar PostgreSQL
 
@@ -72,15 +91,11 @@ Frontend disponible en:
 - `http://localhost:4200`
 
 ## Usuarios seed
-Usuarios base:
-- `11111111-1` / `admin@controlmigratorio.local` (ADMINISTRADOR)
-- `22222222-2` / `operador@controlmigratorio.local` (OPERADOR)
-- `33333333-3` / `consulta@controlmigratorio.local` (CONSULTA)
-- `17.754.725-5` (ADMINISTRADOR)
+Usuario base:
+- `15.960.680-5` (ADMINISTRADOR)
 
-Claves seed:
-- `11111111-1`, `22222222-2`, `33333333-3` -> `ChangeMe123!`
-- `17.754.725-5` -> `Admin123*`
+Clave:
+- `Admin123*`
 
 ## Flujo de negocio implementado
 - Caso con menores involucrados: derivación inicial a `CARABINEROS` y estado `DERIVADO_CARABINEROS`.
