@@ -31,3 +31,8 @@ Acceso inicial (después de seed):
 - Deploy en servidor (HTTPS, backup, control de acceso): [docs/tecnico/deploy-servidor.md](docs/tecnico/deploy-servidor.md)
 - Arquitectura del sistema: [docs/tecnico/arquitectura.md](docs/tecnico/arquitectura.md)
 - Endpoints REST: [docs/tecnico/endpoints.md](docs/tecnico/endpoints.md)
+
+
+git add -A
+git commit -m "mensaje del cambio"
+git push origin main
