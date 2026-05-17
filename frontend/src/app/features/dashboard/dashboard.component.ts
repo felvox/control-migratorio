@@ -1,5 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import { DashboardService } from './dashboard.service';
 
 type TipoControlDashboard = 'INGRESO' | 'EGRESO' | 'TERRITORIO';
@@ -107,18 +109,6 @@ interface BarraNacionalidad {
   imports: [CommonModule],
   template: `
     <div class="dashboard-page" *ngIf="resumen as data; else loadingTpl">
-      <header class="top-head">
-        <label class="date-chip" aria-label="Fecha de referencia">
-          <span class="date-icon">📅</span>
-          <input
-            class="date-input"
-            type="date"
-            [value]="fechaSeleccionadaIso"
-            (change)="onFechaSeleccionada($event)"
-          />
-        </label>
-      </header>
-
       <section class="kpi-row" aria-label="Métricas principales">
         <article class="kpi-card kpi-blue">
           <div class="kpi-icon">📋</div>
@@ -382,42 +372,6 @@ interface BarraNacionalidad {
       .dashboard-page {
         display: grid;
         gap: 0.72rem;
-      }
-
-      .top-head {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        padding: 0.05rem 0.1rem 0.18rem;
-      }
-
-      .date-chip {
-        border: 1px solid #d9e1eb;
-        border-radius: 11px;
-        background: #ffffff;
-        padding: 0.66rem 0.85rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.52rem;
-        color: #334155;
-        font-weight: 600;
-        white-space: nowrap;
-      }
-
-      .date-icon {
-        opacity: 0.72;
-      }
-
-      .date-input {
-        border: 0;
-        background: transparent;
-        padding: 0;
-        color: #334155;
-        font-weight: 600;
-      }
-
-      .date-input:focus {
-        outline: none;
       }
 
       .kpi-row {
@@ -856,12 +810,6 @@ interface BarraNacionalidad {
       }
 
       @media (max-width: 760px) {
-        .top-head {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 0.6rem;
-        }
-
         .kpi-row,
         .charts-grid {
           grid-template-columns: 1fr;
@@ -882,6 +830,8 @@ interface BarraNacionalidad {
 })
 export class DashboardComponent implements OnInit {
   private readonly dashboardService = inject(DashboardService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   resumen: DashboardResumen | null = null;
   fechaSeleccionada = new Date();
@@ -896,7 +846,14 @@ export class DashboardComponent implements OnInit {
   readonly paddingBottom = 32;
 
   ngOnInit(): void {
-    this.cargarResumen();
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const fechaParam = params.get('fecha') ?? '';
+        const fecha = this.parsearFechaIso(fechaParam) ?? new Date();
+        this.fechaSeleccionada = fecha;
+        this.cargarResumen();
+      });
   }
 
   get fechaSeleccionadaIso(): string {
@@ -904,23 +861,6 @@ export class DashboardComponent implements OnInit {
     const month = String(this.fechaSeleccionada.getMonth() + 1).padStart(2, '0');
     const day = String(this.fechaSeleccionada.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-  }
-
-  onFechaSeleccionada(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    const value = target?.value;
-
-    if (!value) {
-      return;
-    }
-
-    const date = new Date(`${value}T12:00:00`);
-    if (Number.isNaN(date.getTime())) {
-      return;
-    }
-
-    this.fechaSeleccionada = date;
-    this.cargarResumen();
   }
 
   get etiquetaKpiDia(): string {
@@ -1172,5 +1112,14 @@ export class DashboardComponent implements OnInit {
         this.resumen = resumen;
         this.paginaActual = 1;
       });
+  }
+
+  private parsearFechaIso(value: string): Date | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return null;
+    }
+
+    const date = new Date(`${value}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
 }

@@ -113,9 +113,20 @@ interface MenuItem {
       </aside>
 
       <main class="content">
-        <header class="topbar">
+        <header class="topbar" [class.topbar-dashboard]="esDashboardActivo">
           <div class="topbar-page-title">
             <h2>{{ tituloPaginaActual }}</h2>
+          </div>
+          <div class="topbar-center" *ngIf="esDashboardActivo">
+            <label class="topbar-date-chip" aria-label="Fecha de referencia del panel">
+              <span class="topbar-date-icon">📅</span>
+              <input
+                class="topbar-date-input"
+                type="date"
+                [value]="fechaDashboardIso"
+                (change)="onDashboardFechaChange($event)"
+              />
+            </label>
           </div>
           <div class="topbar-user">
             <strong>{{ authService.currentUser?.nombreCompleto }}</strong>
@@ -384,6 +395,7 @@ interface MenuItem {
 
       .topbar-page-title {
         min-width: 0;
+        flex: 1 1 auto;
       }
 
       .topbar-page-title h2 {
@@ -396,10 +408,54 @@ interface MenuItem {
         text-overflow: ellipsis;
       }
 
+      .topbar-center {
+        justify-self: center;
+      }
+
+      .topbar.topbar-dashboard {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      }
+
+      .topbar-date-chip {
+        border: 1px solid #d9e1eb;
+        border-radius: 11px;
+        background: #ffffff;
+        padding: 0.56rem 0.78rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.52rem;
+        color: #334155;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .topbar-date-icon {
+        opacity: 0.72;
+      }
+
+      .topbar-date-input {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: #334155;
+        font-weight: 700;
+      }
+
+      .topbar-date-input:focus {
+        outline: none;
+      }
+
       .topbar-user {
         display: flex;
         align-items: center;
         gap: 0.55rem;
+        margin-left: auto;
+      }
+
+      .topbar.topbar-dashboard .topbar-user {
+        justify-self: end;
+        margin-left: 0;
       }
 
       .content-body {
@@ -433,6 +489,16 @@ interface MenuItem {
           align-items: flex-start;
           gap: 0.5rem;
         }
+
+        .topbar.topbar-dashboard {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar.topbar-dashboard .topbar-page-title,
+        .topbar.topbar-dashboard .topbar-center,
+        .topbar.topbar-dashboard .topbar-user {
+          justify-self: start;
+        }
       }
     `,
   ],
@@ -446,6 +512,8 @@ export class LayoutComponent implements OnInit {
   sidebarOculta = false;
   menuItemsVisibles: MenuItem[] = [];
   tituloPaginaActual = 'Sistema Web de Control Migratorio';
+  esDashboardActivo = false;
+  fechaDashboardIso = this.formatearFechaIso(new Date());
 
   private readonly menuItems: MenuItem[] = [
     {
@@ -556,6 +624,15 @@ export class LayoutComponent implements OnInit {
       typeof titulo === 'string' && titulo.trim().length > 0
         ? titulo
         : 'Sistema Web de Control Migratorio';
+
+    this.esDashboardActivo = rutaActiva.routeConfig?.path === 'dashboard';
+    if (!this.esDashboardActivo) {
+      return;
+    }
+
+    const fechaParam = rutaActiva.snapshot.queryParamMap.get('fecha') ?? '';
+    const fechaNormalizada = this.normalizarFechaIso(fechaParam);
+    this.fechaDashboardIso = fechaNormalizada ?? this.formatearFechaIso(new Date());
   }
 
   private obtenerRutaActiva(route: ActivatedRoute): ActivatedRoute {
@@ -579,5 +656,40 @@ export class LayoutComponent implements OnInit {
     this.authService.logout().subscribe(() => {
       this.router.navigate(['/login']);
     });
+  }
+
+  onDashboardFechaChange(event: Event): void {
+    if (!this.esDashboardActivo) {
+      return;
+    }
+
+    const target = event.target as HTMLInputElement | null;
+    const fecha = this.normalizarFechaIso(target?.value ?? '');
+    if (!fecha) {
+      return;
+    }
+
+    this.fechaDashboardIso = fecha;
+    this.router.navigate(['/dashboard'], { queryParams: { fecha } });
+  }
+
+  private normalizarFechaIso(fecha: string): string | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return null;
+    }
+
+    const date = new Date(`${fecha}T12:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return this.formatearFechaIso(date);
+  }
+
+  private formatearFechaIso(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 }
