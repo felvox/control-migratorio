@@ -108,23 +108,22 @@ interface BarraNacionalidad {
   template: `
     <div class="dashboard-page" *ngIf="resumen as data; else loadingTpl">
       <header class="top-head">
-        <div>
-          <h1>Panel de Control Migratorio</h1>
-          <p>Resumen operativo diario y seguimiento de casos</p>
-        </div>
-
-        <div class="date-chip" aria-label="Fecha actual">
+        <label class="date-chip" aria-label="Fecha de referencia">
           <span class="date-icon">📅</span>
-          <span>{{ fechaSeleccionada | date: 'dd "de" MMMM "de" yyyy' : '' : 'es-CL' }}</span>
-          <span class="date-caret">▾</span>
-        </div>
+          <input
+            class="date-input"
+            type="date"
+            [value]="fechaSeleccionadaIso"
+            (change)="onFechaSeleccionada($event)"
+          />
+        </label>
       </header>
 
       <section class="kpi-row" aria-label="Métricas principales">
         <article class="kpi-card kpi-blue">
           <div class="kpi-icon">📋</div>
           <div>
-            <label>Actas registradas hoy</label>
+            <label>{{ etiquetaKpiDia }}</label>
             <strong>{{ data.metricasOperativas.actasHoy }}</strong>
           </div>
         </article>
@@ -285,22 +284,6 @@ interface BarraNacionalidad {
         </article>
       </section>
 
-      <section class="alerts-panel">
-        <div class="alerts-head">
-          <h3>Alertas críticas</h3>
-        </div>
-
-        <div class="alerts-grid">
-          <div class="alert-item" *ngFor="let alerta of alertasVista">
-            <span>⚠️</span>
-            <p>
-              <strong>{{ alerta.total }}</strong>
-              {{ alerta.texto }}
-            </p>
-          </div>
-        </div>
-      </section>
-
       <section class="table-panel">
         <h3>Últimos casos registrados</h3>
 
@@ -403,22 +386,9 @@ interface BarraNacionalidad {
 
       .top-head {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
         align-items: center;
-        padding: 0.2rem 0.15rem 0.35rem;
-      }
-
-      .top-head h1 {
-        margin: 0;
-        font-size: clamp(1.45rem, 2vw, 2.08rem);
-        line-height: 1.1;
-        color: #0f172a;
-      }
-
-      .top-head p {
-        margin: 0.18rem 0 0;
-        color: #64748b;
-        font-size: 1rem;
+        padding: 0.05rem 0.1rem 0.18rem;
       }
 
       .date-chip {
@@ -434,9 +404,20 @@ interface BarraNacionalidad {
         white-space: nowrap;
       }
 
-      .date-icon,
-      .date-caret {
+      .date-icon {
         opacity: 0.72;
+      }
+
+      .date-input {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: #334155;
+        font-weight: 600;
+      }
+
+      .date-input:focus {
+        outline: none;
       }
 
       .kpi-row {
@@ -732,45 +713,6 @@ interface BarraNacionalidad {
         font-size: 0.68rem;
       }
 
-      .alerts-panel {
-        background: #fffaf0;
-        border-color: #f1d9ac;
-      }
-
-      .alerts-head {
-        margin-bottom: 0.5rem;
-      }
-
-      .alerts-head h3 {
-        color: #b76e05;
-      }
-
-      .alerts-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0.55rem;
-      }
-
-      .alert-item {
-        border: 1px solid #efd8ac;
-        background: #fffdf8;
-        border-radius: 10px;
-        padding: 0.54rem 0.62rem;
-        display: grid;
-        grid-template-columns: auto 1fr;
-        gap: 0.45rem;
-      }
-
-      .alert-item p {
-        margin: 0;
-        color: #5b4c33;
-        font-size: 0.83rem;
-      }
-
-      .alert-item strong {
-        color: #d33f2f;
-      }
-
       .table-panel {
         display: grid;
         gap: 0.58rem;
@@ -911,9 +853,6 @@ interface BarraNacionalidad {
           grid-column: 1 / -1;
         }
 
-        .alerts-grid {
-          grid-template-columns: repeat(2, minmax(230px, 1fr));
-        }
       }
 
       @media (max-width: 760px) {
@@ -924,8 +863,7 @@ interface BarraNacionalidad {
         }
 
         .kpi-row,
-        .charts-grid,
-        .alerts-grid {
+        .charts-grid {
           grid-template-columns: 1fr;
         }
 
@@ -958,10 +896,41 @@ export class DashboardComponent implements OnInit {
   readonly paddingBottom = 32;
 
   ngOnInit(): void {
-    this.dashboardService.obtenerResumen().subscribe((resumen: DashboardResumen) => {
-      this.resumen = resumen;
-      this.paginaActual = 1;
-    });
+    this.cargarResumen();
+  }
+
+  get fechaSeleccionadaIso(): string {
+    const year = this.fechaSeleccionada.getFullYear();
+    const month = String(this.fechaSeleccionada.getMonth() + 1).padStart(2, '0');
+    const day = String(this.fechaSeleccionada.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  onFechaSeleccionada(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const value = target?.value;
+
+    if (!value) {
+      return;
+    }
+
+    const date = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return;
+    }
+
+    this.fechaSeleccionada = date;
+    this.cargarResumen();
+  }
+
+  get etiquetaKpiDia(): string {
+    const hoy = new Date();
+    const esHoy =
+      hoy.getFullYear() === this.fechaSeleccionada.getFullYear() &&
+      hoy.getMonth() === this.fechaSeleccionada.getMonth() &&
+      hoy.getDate() === this.fechaSeleccionada.getDate();
+
+    return esHoy ? 'Actas registradas hoy' : 'Actas del día seleccionado';
   }
 
   etiquetaTipo(tipo: TipoControlDashboard): string {
@@ -1076,7 +1045,7 @@ export class DashboardComponent implements OnInit {
   }
 
   private tendenciaBase(): Array<{ fecha: string; etiqueta: string; total: number }> {
-    const inicio = new Date();
+    const inicio = new Date(this.fechaSeleccionada);
     inicio.setDate(inicio.getDate() - 6);
 
     return Array.from({ length: 7 }, (_, i) => {
@@ -1174,25 +1143,6 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  get alertasVista(): Array<{ total: number; texto: string }> {
-    const alertas = this.resumen?.alertas;
-    if (!alertas) {
-      return [
-        { total: 0, texto: 'casos de menor de edad pendientes' },
-        { total: 0, texto: 'personas con lesiones requieren revisión' },
-        { total: 0, texto: 'actas sin firma de conformidad' },
-        { total: 0, texto: 'casos sin cierre operativo' },
-      ];
-    }
-
-    return [
-      { total: alertas.menoresPendientes, texto: 'casos de menor de edad pendientes' },
-      { total: alertas.lesionesRevision, texto: 'personas con lesiones requieren revisión' },
-      { total: alertas.actasSinFirma, texto: 'actas sin firma de conformidad' },
-      { total: alertas.sinCierreOperativo, texto: 'casos sin cierre operativo' },
-    ];
-  }
-
   get totalPaginas(): number {
     return Math.max(Math.ceil(this.filasTabla.length / this.tamPagina), 1);
   }
@@ -1212,5 +1162,15 @@ export class DashboardComponent implements OnInit {
     }
 
     this.paginaActual = pagina;
+  }
+
+  private cargarResumen(): void {
+    this.resumen = null;
+    this.dashboardService
+      .obtenerResumen(this.fechaSeleccionadaIso)
+      .subscribe((resumen: DashboardResumen) => {
+        this.resumen = resumen;
+        this.paginaActual = 1;
+      });
   }
 }

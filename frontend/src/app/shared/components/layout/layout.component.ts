@@ -1,7 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  ActivatedRoute,
+  NavigationEnd,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { Rol } from '../../../core/models/auth.model';
 
@@ -107,6 +114,9 @@ interface MenuItem {
 
       <main class="content">
         <header class="topbar">
+          <div class="topbar-page-title">
+            <h2>{{ tituloPaginaActual }}</h2>
+          </div>
           <div class="topbar-user">
             <strong>{{ authService.currentUser?.nombreCompleto }}</strong>
             <span class="badge">{{ authService.currentUser?.rol }}</span>
@@ -362,13 +372,28 @@ interface MenuItem {
 
       .topbar {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
         align-items: center;
         min-height: 58px;
         padding: 0.72rem 0.92rem;
         border-radius: 10px;
         border: 1px solid #d8e0e8;
         background: #ffffff;
+        gap: 0.8rem;
+      }
+
+      .topbar-page-title {
+        min-width: 0;
+      }
+
+      .topbar-page-title h2 {
+        margin: 0;
+        font-size: 1.18rem;
+        font-weight: 700;
+        color: #223243;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .topbar-user {
@@ -414,11 +439,13 @@ interface MenuItem {
 })
 export class LayoutComponent implements OnInit {
   readonly authService = inject(AuthService);
+  private readonly activatedRoute = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   sidebarOculta = false;
   menuItemsVisibles: MenuItem[] = [];
+  tituloPaginaActual = 'Sistema Web de Control Migratorio';
 
   private readonly menuItems: MenuItem[] = [
     {
@@ -438,7 +465,7 @@ export class LayoutComponent implements OnInit {
     {
       label: 'Consultar Casos',
       path: '/casos',
-      roles: ['ADMINISTRADOR', 'OPERADOR', 'CONSULTA'],
+      roles: ['ADMINISTRADOR', 'OPERADOR', 'CONSULTA', 'AUDITOR'],
       icon: 'casos',
       exact: true,
     },
@@ -448,7 +475,6 @@ export class LayoutComponent implements OnInit {
       roles: ['ADMINISTRADOR'],
       icon: 'usuarios',
       dividerBefore: true,
-      disabled: true,
     },
     {
       label: 'Reportes',
@@ -468,9 +494,19 @@ export class LayoutComponent implements OnInit {
 
   ngOnInit(): void {
     this.actualizarMenuItemsVisibles();
+    this.actualizarTituloPagina();
+
     this.authService.user$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.actualizarMenuItemsVisibles());
+
+    this.router.events
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((event) => {
+        if (event instanceof NavigationEnd) {
+          this.actualizarTituloPagina();
+        }
+      });
   }
 
   toggleSidebar(): void {
@@ -511,6 +547,25 @@ export class LayoutComponent implements OnInit {
     }
 
     this.menuItemsVisibles = menuPorRol;
+  }
+
+  private actualizarTituloPagina(): void {
+    const rutaActiva = this.obtenerRutaActiva(this.activatedRoute);
+    const titulo = rutaActiva.snapshot.data?.['pageTitle'];
+    this.tituloPaginaActual =
+      typeof titulo === 'string' && titulo.trim().length > 0
+        ? titulo
+        : 'Sistema Web de Control Migratorio';
+  }
+
+  private obtenerRutaActiva(route: ActivatedRoute): ActivatedRoute {
+    let actual = route;
+
+    while (actual.firstChild) {
+      actual = actual.firstChild;
+    }
+
+    return actual;
   }
 
   private getMenuByPaths(paths: string[]): MenuItem[] {

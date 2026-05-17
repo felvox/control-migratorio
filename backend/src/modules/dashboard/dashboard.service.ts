@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   EstadoCaso,
   InstitucionDerivacion,
+  Prisma,
   TipoControl,
   TipoPersona,
 } from '@prisma/client';
@@ -20,21 +21,100 @@ export class DashboardService {
     return `${day}/${month}/${year.slice(-2)}`;
   }
 
-  async resumenAdministrador() {
-    const now = new Date();
+  private resolverFechaBase(fecha?: string): Date {
+    if (!fecha) {
+      return new Date();
+    }
 
-    const inicioDia = new Date(now);
-    inicioDia.setHours(0, 0, 0, 0);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+    if (!match) {
+      return new Date();
+    }
 
-    const inicioSemana = new Date(now);
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+
+    const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date();
+    }
+
+    return parsed;
+  }
+
+  private inicioDia(fecha: Date): Date {
+    const inicio = new Date(fecha);
+    inicio.setHours(0, 0, 0, 0);
+    return inicio;
+  }
+
+  private finDia(fecha: Date): Date {
+    const fin = new Date(fecha);
+    fin.setHours(23, 59, 59, 999);
+    return fin;
+  }
+
+  private fechaClaveLocal(fecha: Date): string {
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  async resumenAdministrador(fecha?: string) {
+    const fechaBase = this.resolverFechaBase(fecha);
+    const inicioDia = this.inicioDia(fechaBase);
+    const finDia = this.finDia(fechaBase);
+
+    const inicioSemana = new Date(inicioDia);
     const day = inicioSemana.getDay();
     const diff = day === 0 ? 6 : day - 1;
     inicioSemana.setDate(inicioSemana.getDate() - diff);
     inicioSemana.setHours(0, 0, 0, 0);
 
-    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inicioMes = new Date(
+      fechaBase.getFullYear(),
+      fechaBase.getMonth(),
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
     const inicioTendencia = new Date(inicioDia);
     inicioTendencia.setDate(inicioTendencia.getDate() - 6);
+
+    const whereHastaFecha: Prisma.CasoWhereInput = {
+      eliminadoAt: null,
+      fechaHoraProcedimiento: {
+        lte: finDia,
+      },
+    };
+
+    const whereDia: Prisma.CasoWhereInput = {
+      eliminadoAt: null,
+      fechaHoraProcedimiento: {
+        gte: inicioDia,
+        lte: finDia,
+      },
+    };
+
+    const whereSemana: Prisma.CasoWhereInput = {
+      eliminadoAt: null,
+      fechaHoraProcedimiento: {
+        gte: inicioSemana,
+        lte: finDia,
+      },
+    };
+
+    const whereMes: Prisma.CasoWhereInput = {
+      eliminadoAt: null,
+      fechaHoraProcedimiento: {
+        gte: inicioMes,
+        lte: finDia,
+      },
+    };
 
     const [
       totalDia,
@@ -62,34 +142,17 @@ export class DashboardService {
     ] =
       await Promise.all([
         this.prisma.caso.count({
-          where: {
-            eliminadoAt: null,
-            creadoAt: {
-              gte: inicioDia,
-            },
-          },
+          where: whereDia,
         }),
         this.prisma.caso.count({
-          where: {
-            eliminadoAt: null,
-            creadoAt: {
-              gte: inicioSemana,
-            },
-          },
+          where: whereSemana,
         }),
         this.prisma.caso.count({
-          where: {
-            eliminadoAt: null,
-            creadoAt: {
-              gte: inicioMes,
-            },
-          },
+          where: whereMes,
         }),
         this.prisma.caso.groupBy({
           by: ['estado'],
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           _count: {
             estado: true,
           },
@@ -111,11 +174,9 @@ export class DashboardService {
           },
         }),
         this.prisma.caso.findMany({
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           orderBy: {
-            creadoAt: 'desc',
+            fechaHoraProcedimiento: 'desc',
           },
           take: 30,
           include: {
@@ -139,64 +200,53 @@ export class DashboardService {
         this.prisma.caso.findMany({
           where: {
             eliminadoAt: null,
-            creadoAt: {
+            fechaHoraProcedimiento: {
               gte: inicioTendencia,
+              lte: finDia,
             },
           },
           select: {
-            creadoAt: true,
+            fechaHoraProcedimiento: true,
           },
         }),
         this.prisma.caso.groupBy({
           by: ['tipoControl'],
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           _count: {
             tipoControl: true,
           },
         }),
         this.prisma.caso.groupBy({
           by: ['institucionDerivacion'],
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           _count: {
             institucionDerivacion: true,
           },
         }),
         this.prisma.caso.groupBy({
           by: ['documentado'],
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           _count: {
             documentado: true,
           },
         }),
         this.prisma.caso.groupBy({
           by: ['existenMenores'],
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           _count: {
             existenMenores: true,
           },
         }),
         this.prisma.caso.groupBy({
           by: ['estado', 'documentado'],
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           _count: {
             estado: true,
           },
         }),
         this.prisma.caso.groupBy({
           by: ['lugar'],
-          where: {
-            eliminadoAt: null,
-          },
+          where: whereHastaFecha,
           _count: {
             lugar: true,
           },
@@ -209,7 +259,7 @@ export class DashboardService {
         }),
         this.prisma.caso.count({
           where: {
-            eliminadoAt: null,
+            ...whereHastaFecha,
             OR: [
               {
                 estadoSalud: {
@@ -228,19 +278,19 @@ export class DashboardService {
         }),
         this.prisma.caso.count({
           where: {
-            eliminadoAt: null,
+            ...whereHastaFecha,
             estado: EstadoCaso.PENDIENTE,
           },
         }),
         this.prisma.caso.count({
           where: {
-            eliminadoAt: null,
+            ...whereHastaFecha,
             estado: EstadoCaso.CERRADO,
           },
         }),
         this.prisma.caso.count({
           where: {
-            eliminadoAt: null,
+            ...whereHastaFecha,
             estado: {
               in: [
                 EstadoCaso.PENDIENTE,
@@ -252,7 +302,7 @@ export class DashboardService {
         }),
         this.prisma.caso.count({
           where: {
-            eliminadoAt: null,
+            ...whereHastaFecha,
             existenMenores: true,
             estado: EstadoCaso.PENDIENTE,
           },
@@ -261,7 +311,7 @@ export class DashboardService {
           by: ['nacionalidad'],
           where: {
             caso: {
-              eliminadoAt: null,
+              ...whereHastaFecha,
             },
           },
           _count: {
@@ -277,14 +327,14 @@ export class DashboardService {
         this.prisma.persona.count({
           where: {
             caso: {
-              eliminadoAt: null,
+              ...whereHastaFecha,
             },
           },
         }),
         this.prisma.persona.count({
           where: {
             caso: {
-              eliminadoAt: null,
+              ...whereHastaFecha,
             },
             OR: [
               {
@@ -304,12 +354,12 @@ export class DashboardService {
     for (let i = 0; i < 7; i += 1) {
       const dia = new Date(inicioTendencia);
       dia.setDate(inicioTendencia.getDate() + i);
-      const iso = dia.toISOString().slice(0, 10);
+      const iso = this.fechaClaveLocal(dia);
       diasConConteo.set(iso, 0);
     }
 
     casosParaTendencia.forEach((item) => {
-      const iso = new Date(item.creadoAt).toISOString().slice(0, 10);
+      const iso = this.fechaClaveLocal(new Date(item.fechaHoraProcedimiento));
       if (!diasConConteo.has(iso)) {
         return;
       }

@@ -1,9 +1,8 @@
-export type Rol = 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA';
+export type Rol = 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
 
 export interface UsuarioSesion {
   id: string;
   run: string;
-  email?: string | null;
   nombreCompleto: string;
   rol: Rol;
 }

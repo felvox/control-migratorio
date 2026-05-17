@@ -50,13 +50,13 @@ export class EvidenciasController {
   }
 
   @Get('casos/:casoId/evidencias')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA)
+  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
   listar(@Param('casoId') casoId: string, @CurrentUser() user: AuthUser) {
     return this.evidenciasService.listarPorCaso(casoId, user);
   }
 
   @Get('evidencias/:id/download')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA)
+  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
   async descargar(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,

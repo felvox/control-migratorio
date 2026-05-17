@@ -9,8 +9,6 @@ import { ReportesService } from './reportes.service';
   imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="page-grid">
-      <h2>Reportes</h2>
-
       <article class="card">
         <form [formGroup]="filtrosForm" class="form-grid">
           <div>
@@ -37,7 +35,6 @@ import { ReportesService } from './reportes.service';
               <option value="">Todos</option>
               <option value="INGRESO">Ingreso</option>
               <option value="EGRESO">Egreso</option>
-              <option value="TERRITORIO">Territorio</option>
             </select>
           </div>
           <div>

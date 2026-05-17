@@ -76,6 +76,18 @@ export class UsuariosController {
     });
   }
 
+  @Patch(':id/activar')
+  activar(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthUser,
+    @Req() req: Request,
+  ) {
+    return this.usuariosService.activar(id, actor.id, {
+      ip: req.ip,
+      userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
+    });
+  }
+
   @Patch(':id/reset-password')
   resetearPassword(
     @Param('id') id: string,

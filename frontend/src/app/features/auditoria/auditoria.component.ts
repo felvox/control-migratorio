@@ -9,8 +9,6 @@ import { AuditoriaItem, AuditoriaService } from './auditoria.service';
   imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="page-grid">
-      <h2>Auditoría</h2>
-
       <article class="card">
         <form [formGroup]="filtrosForm" class="form-grid" (ngSubmit)="buscar()">
           <div>

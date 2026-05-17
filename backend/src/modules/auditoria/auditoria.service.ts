@@ -115,7 +115,6 @@ export class AuditoriaService {
             select: {
               id: true,
               nombreCompleto: true,
-              email: true,
               rol: true,
             },
           },

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,7 +12,7 @@ export class DashboardController {
 
   @Get('resumen')
   @Roles(Role.ADMINISTRADOR)
-  obtenerResumen() {
-    return this.dashboardService.resumenAdministrador();
+  obtenerResumen(@Query('fecha') fecha?: string) {
+    return this.dashboardService.resumenAdministrador(fecha);
   }
 }

@@ -18,7 +18,6 @@ import { AuthService } from '../../core/services/auth.service';
   template: `
     <div class="page-grid" *ngIf="caso">
       <div class="header-row">
-        <h2>Detalle Caso {{ caso.codigo }}</h2>
         <div style="display: flex; gap: 0.5rem;">
           <button
             class="btn-secondary"
@@ -33,6 +32,7 @@ import { AuthService } from '../../core/services/auth.service';
 
       <article class="card">
         <h3>Resumen</h3>
+        <p><strong>Código:</strong> {{ caso.codigo }}</p>
         <p>
           <strong>Estado:</strong> {{ caso.estado }} | <strong>Derivación:</strong>
           {{ caso.institucionDerivacion }}
@@ -188,14 +188,13 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [
     `
-      h2,
       h3 {
         margin: 0;
       }
 
       .header-row {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
         align-items: center;
         gap: 0.8rem;
       }

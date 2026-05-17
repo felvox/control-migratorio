@@ -41,13 +41,13 @@ export class CasosController {
   }
 
   @Get()
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA)
+  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
   listar(@Query() query: QueryCasosDto, @CurrentUser() user: AuthUser) {
     return this.casosService.listar(query, user);
   }
 
   @Get(':id')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA)
+  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
   obtenerPorId(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.casosService.obtenerPorId(id, user);
   }

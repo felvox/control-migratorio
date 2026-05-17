@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { CasosService } from './casos.service';
 import { Caso } from '../../core/models/caso.model';
 import { AuthService } from '../../core/services/auth.service';
@@ -9,20 +9,9 @@ import { AuthService } from '../../core/services/auth.service';
 @Component({
   selector: 'app-casos-list',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <div class="page-grid">
-      <div class="header-row">
-        <h2>Casos</h2>
-        <button
-          *ngIf="puedeEditar"
-          class="btn-primary"
-          [routerLink]="['/casos/nuevo']"
-        >
-          Nuevo caso
-        </button>
-      </div>
-
       <article class="card">
         <form [formGroup]="filtrosForm" class="form-grid" (ngSubmit)="buscar()">
           <div>
@@ -104,16 +93,6 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [
     `
-      .header-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      h2 {
-        margin: 0;
-      }
-
       td:last-child {
         display: flex;
         gap: 0.4rem;

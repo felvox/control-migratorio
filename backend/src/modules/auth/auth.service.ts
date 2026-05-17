@@ -64,7 +64,6 @@ export class AuthService {
       user: {
         id: usuario.id,
         run: usuario.run,
-        email: usuario.email,
         nombreCompleto: usuario.nombreCompleto,
         rol: usuario.rol,
       },
@@ -91,7 +90,6 @@ export class AuthService {
       select: {
         id: true,
         run: true,
-        email: true,
         nombreCompleto: true,
         rol: true,
         activo: true,

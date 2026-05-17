@@ -100,7 +100,7 @@ const LOGIN_PASSWORD_KEY = 'cm_login_password';
         display: grid;
         place-items: center;
         padding: 1rem;
-        background-image: url('/assets/login-fondo.jpeg');
+        background-image: url('/assets/login.png');
         background-size: cover;
         background-position: center;
       }
@@ -108,7 +108,7 @@ const LOGIN_PASSWORD_KEY = 'cm_login_password';
       .login-overlay {
         position: absolute;
         inset: 0;
-        background: linear-gradient(90deg, rgba(3, 15, 26, 0.75), rgba(8, 18, 26, 0.55));
+        background: linear-gradient(90deg, rgba(3, 15, 26, 0.28), rgba(8, 18, 26, 0.18));
       }
 
       .login-panel {
@@ -130,7 +130,7 @@ const LOGIN_PASSWORD_KEY = 'cm_login_password';
       }
 
       .left-column {
-        background: linear-gradient(180deg, rgba(4, 19, 34, 0.58), rgba(4, 19, 34, 0.25));
+        background: transparent;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -150,7 +150,7 @@ const LOGIN_PASSWORD_KEY = 'cm_login_password';
       }
 
       .right-column {
-        background: linear-gradient(180deg, rgba(6, 13, 20, 0.78), rgba(6, 13, 20, 0.88));
+        background: transparent;
         display: flex;
         flex-direction: column;
         justify-content: center;

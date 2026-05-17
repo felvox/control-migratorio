@@ -6,11 +6,17 @@ import { PaginatedResponse } from '../../core/models/paginated.model';
 export interface UsuarioListado {
   id: string;
   run: string;
-  email?: string | null;
   nombreCompleto: string;
-  rol: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA';
+  rol: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
   activo: boolean;
   ultimoAcceso: string | null;
+}
+
+export interface UsuarioActualizacion {
+  run?: string;
+  nombreCompleto?: string;
+  rol?: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
+  activo?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -34,9 +40,10 @@ export class UsuariosService {
 
   crear(payload: {
     run: string;
-    email?: string;
-    nombreCompleto: string;
-    rol: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA';
+    grado: string;
+    nombre: string;
+    apellidos: string;
+    rol: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
     password: string;
   }) {
     return this.http.post<UsuarioListado>(`${this.apiUrl}/usuarios`, payload);
@@ -46,9 +53,21 @@ export class UsuariosService {
     return this.http.patch(`${this.apiUrl}/usuarios/${id}/desactivar`, {});
   }
 
+  activar(id: string) {
+    return this.http.patch(`${this.apiUrl}/usuarios/${id}/activar`, {});
+  }
+
   resetearPassword(id: string, nuevaPassword: string) {
     return this.http.patch(`${this.apiUrl}/usuarios/${id}/reset-password`, {
       nuevaPassword,
     });
+  }
+
+  actualizar(id: string, payload: UsuarioActualizacion) {
+    return this.http.patch<UsuarioListado>(`${this.apiUrl}/usuarios/${id}`, payload);
+  }
+
+  eliminarLogico(id: string) {
+    return this.http.delete<{ id: string; message: string }>(`${this.apiUrl}/usuarios/${id}`);
   }
 }

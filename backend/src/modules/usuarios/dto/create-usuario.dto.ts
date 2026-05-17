@@ -1,12 +1,9 @@
 import { Role } from '@prisma/client';
 import {
-  IsEmail,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
-  IsString,
   Matches,
-  MinLength,
+  IsString,
 } from 'class-validator';
 
 export class CreateUsuarioDto {
@@ -17,18 +14,25 @@ export class CreateUsuarioDto {
   })
   run: string;
 
-  @IsOptional()
-  @IsEmail()
-  email?: string;
+  @IsString()
+  @IsNotEmpty()
+  grado: string;
 
   @IsString()
   @IsNotEmpty()
-  nombreCompleto: string;
+  nombre: string;
+
+  @IsString()
+  @IsNotEmpty()
+  apellidos: string;
 
   @IsEnum(Role)
   rol: Role;
 
   @IsString()
-  @MinLength(8)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/, {
+    message:
+      'La contraseña debe tener al menos 10 caracteres, mayúscula, minúscula, número y símbolo.',
+  })
   password: string;
 }

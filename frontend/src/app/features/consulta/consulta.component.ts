@@ -10,9 +10,6 @@ import { Caso } from '../../core/models/caso.model';
   imports: [CommonModule, RouterLink],
   template: `
     <div class="page-grid">
-      <h2>Vista Consulta</h2>
-      <p>Acceso de solo lectura para búsqueda y revisión de casos.</p>
-
       <article class="card table-wrap">
         <table>
           <thead>

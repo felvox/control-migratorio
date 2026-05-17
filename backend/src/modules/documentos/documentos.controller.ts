@@ -36,13 +36,13 @@ export class DocumentosController {
   }
 
   @Get('casos/:id/documentos')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA)
+  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
   listarPorCaso(@Param('id') casoId: string, @CurrentUser() user: AuthUser) {
     return this.documentosService.listarPorCaso(casoId, user);
   }
 
   @Get('documentos/:id/download')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA)
+  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
   async descargar(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,

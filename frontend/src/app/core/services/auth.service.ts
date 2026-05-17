@@ -104,6 +104,10 @@ export class AuthService {
       return '/consulta';
     }
 
+    if (rol === 'AUDITOR') {
+      return '/casos';
+    }
+
     return '/casos';
   }
 

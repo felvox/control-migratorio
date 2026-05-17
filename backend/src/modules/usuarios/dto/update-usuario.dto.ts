@@ -1,7 +1,6 @@
 import { Role } from '@prisma/client';
 import {
   IsBoolean,
-  IsEmail,
   IsEnum,
   IsOptional,
   IsString,
@@ -15,10 +14,6 @@ export class UpdateUsuarioDto {
     message: 'RUN inválido',
   })
   run?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
 
   @IsOptional()
   @IsString()

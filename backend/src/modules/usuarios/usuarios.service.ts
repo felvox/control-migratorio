@@ -26,33 +26,39 @@ export class UsuariosService {
     meta?: { ip?: string; userAgent?: string },
   ) {
     const runNormalizado = normalizeRun(dto.run);
-    const emailNormalizado = dto.email ? dto.email.toLowerCase() : null;
+    const grado = dto.grado.trim();
+    const nombre = dto.nombre.trim();
+    const apellidos = dto.apellidos.trim();
+
+    if (!grado || !nombre || !apellidos) {
+      throw new BadRequestException(
+        'Grado, nombre y apellidos son obligatorios',
+      );
+    }
+
+    const nombreCompleto = [grado, nombre, apellidos].join(' ');
 
     const existente = await this.prisma.usuario.findFirst({
       where: {
-        OR: emailNormalizado
-          ? [{ run: runNormalizado }, { email: emailNormalizado }]
-          : [{ run: runNormalizado }],
+        run: runNormalizado,
       },
       select: { id: true },
     });
 
     if (existente) {
-      throw new ConflictException('Ya existe un usuario con ese RUN o email');
+      throw new ConflictException('Ya existe un usuario con ese RUN');
     }
 
     const usuario = await this.prisma.usuario.create({
       data: {
         run: runNormalizado,
-        email: emailNormalizado,
-        nombreCompleto: dto.nombreCompleto,
+        nombreCompleto,
         rol: dto.rol,
         passwordHash: await hashPassword(dto.password),
       },
       select: {
         id: true,
         run: true,
-        email: true,
         nombreCompleto: true,
         rol: true,
         activo: true,
@@ -96,12 +102,6 @@ export class UsuariosService {
                 mode: 'insensitive' as const,
               },
             },
-            {
-              email: {
-                contains: query.busqueda,
-                mode: 'insensitive' as const,
-              },
-            },
           ]
         : undefined,
     };
@@ -116,7 +116,6 @@ export class UsuariosService {
         select: {
           id: true,
           run: true,
-          email: true,
           nombreCompleto: true,
           rol: true,
           activo: true,
@@ -156,7 +155,6 @@ export class UsuariosService {
       select: {
         id: true,
         run: true,
-        email: true,
         nombreCompleto: true,
         rol: true,
         activo: true,
@@ -183,7 +181,6 @@ export class UsuariosService {
     const data: Record<string, unknown> = {
       ...dto,
       run: dto.run ? normalizeRun(dto.run) : undefined,
-      email: dto.email ? dto.email.toLowerCase() : undefined,
     };
 
     try {
@@ -193,7 +190,6 @@ export class UsuariosService {
         select: {
           id: true,
           run: true,
-          email: true,
           nombreCompleto: true,
           rol: true,
           activo: true,
@@ -245,6 +241,56 @@ export class UsuariosService {
       entidad: 'USUARIO',
       entidadId: id,
       descripcion: `Usuario RUN ${usuario.run} desactivado`,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return usuario;
+  }
+
+  async activar(
+    id: string,
+    actorId: string,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    await this.obtenerPorId(id);
+
+    const usuarioActual = await this.prisma.usuario.findFirst({
+      where: {
+        id,
+        eliminadoAt: null,
+      },
+      select: {
+        id: true,
+        run: true,
+        activo: true,
+      },
+    });
+
+    if (!usuarioActual) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (usuarioActual.activo) {
+      throw new BadRequestException('El usuario seleccionado ya está activo');
+    }
+
+    const usuario = await this.prisma.usuario.update({
+      where: { id },
+      data: { activo: true },
+      select: {
+        id: true,
+        run: true,
+        activo: true,
+      },
+    });
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: actorId,
+      accion: 'ACTIVAR_USUARIO',
+      entidad: 'USUARIO',
+      entidadId: id,
+      descripcion: `Usuario RUN ${usuario.run} activado`,
       ip: meta?.ip,
       userAgent: meta?.userAgent,
     });

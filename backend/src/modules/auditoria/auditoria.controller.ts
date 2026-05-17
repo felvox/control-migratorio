@@ -12,7 +12,7 @@ export class AuditoriaController {
   constructor(private readonly auditoriaService: AuditoriaService) {}
 
   @Get()
-  @Roles(Role.ADMINISTRADOR)
+  @Roles(Role.ADMINISTRADOR, Role.AUDITOR)
   listar(@Query() query: QueryAuditoriaDto) {
     return this.auditoriaService.listarAuditoria(query);
   }
