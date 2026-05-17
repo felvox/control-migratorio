@@ -6,7 +6,6 @@ import { CasosService } from './casos.service';
 import {
   Caso,
   DocumentoGenerado,
-  EstadoCaso,
   Evidencia,
 } from '../../core/models/caso.model';
 import { AuthService } from '../../core/services/auth.service';
@@ -69,24 +68,6 @@ import { AuthService } from '../../core/services/auth.service';
             </tbody>
           </table>
         </div>
-      </article>
-
-      <article class="card" *ngIf="puedeEditar">
-        <h3>Estado del caso</h3>
-        <form [formGroup]="estadoForm" (ngSubmit)="actualizarEstado()" class="form-grid">
-          <div>
-            <label>Nuevo estado</label>
-            <select formControlName="estado">
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="DERIVADO_CARABINEROS">Derivado Carabineros</option>
-              <option value="DERIVADO_PDI">Derivado PDI</option>
-              <option value="CERRADO">Cerrado</option>
-            </select>
-          </div>
-          <div style="align-self: end;">
-            <button class="btn-primary">Actualizar estado</button>
-          </div>
-        </form>
       </article>
 
       <article class="card">
@@ -212,10 +193,6 @@ export class CasoDetalleComponent implements OnInit {
   documentos: DocumentoGenerado[] = [];
   archivoSeleccionado: File | null = null;
 
-  readonly estadoForm = this.fb.group({
-    estado: ['PENDIENTE'],
-  });
-
   readonly evidenciaForm = this.fb.group({
     tipoEvidencia: ['ADJUNTO_GENERAL'],
     personaId: [''],
@@ -237,21 +214,8 @@ export class CasoDetalleComponent implements OnInit {
   cargarCaso(id: string): void {
     this.casosService.obtenerPorId(id).subscribe((caso) => {
       this.caso = caso;
-      this.estadoForm.patchValue({ estado: caso.estado });
       this.cargarEvidencias();
       this.cargarDocumentos();
-    });
-  }
-
-  actualizarEstado(): void {
-    if (!this.caso) {
-      return;
-    }
-
-    const estado = this.estadoForm.getRawValue().estado as EstadoCaso;
-
-    this.casosService.cambiarEstado(this.caso.id, estado).subscribe(() => {
-      this.cargarCaso(this.caso!.id);
     });
   }
 

@@ -1,29 +1,34 @@
-# Arquitectura base
+# Arquitectura del sistema
 
 ## Stack
-- Frontend: Angular 18 + TypeScript
-- Backend: NestJS 10 + TypeScript
+
+- Frontend: Angular + TypeScript
+- Backend: NestJS + TypeScript
 - Base de datos: PostgreSQL
 - ORM: Prisma
 - Autenticación: JWT + roles
-- Archivos: storage privado en disco
+- Almacenamiento de archivos: `storage/` (privado)
 
-## Núcleo de negocio
-El sistema gira en torno a `Caso`.
+## Despliegue productivo
 
-Relaciones implementadas:
-- Un caso tiene múltiples personas.
-- Un caso tiene evidencias generales y evidencias por persona.
-- Un caso tiene documentos generados (PDF acta).
-- Las acciones relevantes generan auditoría.
+- `control-migratorio-frontend` en Render Static Site
+- `control-migratorio-backend` en Render Web Service
+- `control-migratorio-db` en Render PostgreSQL
 
-## Seguridad
-- JWT obligatorio para rutas privadas.
-- Guard por roles en backend y frontend.
-- Hash de contraseñas con `bcryptjs`.
-- Acceso a archivos solo por endpoints autenticados.
+## Dominio funcional
+
+El núcleo del sistema es `Caso`.
+
+Relaciones:
+
+- Un `Caso` tiene una o más `Persona`
+- Una `Persona` pertenece a un `Caso`
+- Un `Caso` tiene `Evidencia` general y por persona
+- Un `Caso` tiene `DocumentoGenerado` (acta PDF)
+- Las acciones relevantes generan `Auditoria`
 
 ## Módulos backend
+
 - `auth`
 - `usuarios`
 - `casos`
@@ -34,6 +39,7 @@ Relaciones implementadas:
 - `auditoria`
 
 ## Features frontend
+
 - `auth`
 - `dashboard`
 - `usuarios`
@@ -41,3 +47,10 @@ Relaciones implementadas:
 - `reportes`
 - `auditoria`
 - `consulta`
+
+## Seguridad
+
+- Rutas protegidas por JWT
+- Control por roles: `ADMINISTRADOR`, `OPERADOR`, `CONSULTA`, `AUDITOR`
+- Contraseñas con hash (`bcryptjs`)
+- Descarga de evidencias/documentos solo vía backend autenticado

@@ -1,145 +1,50 @@
-# Despliegue en Servidor (HTTPS + Backup + Acceso Restringido)
+# Deploy en Render
 
-Esta guía es para publicar el sistema en un servidor/hosting con seguridad base de producción.
+Guía base del despliegue actualmente operativo.
 
-## 1) HTTPS activo (Nginx + Let's Encrypt)
+## Servicios creados
 
-Plantilla incluida:
-- `deploy/nginx/control-migratorio.conf`
+1. `control-migratorio-db` (PostgreSQL)
+2. `control-migratorio-backend` (Web Service, Node, raíz `backend`)
+3. `control-migratorio-frontend` (Static Site, raíz `frontend`)
 
-Definir el dominio público (FQDN) que usará el sistema:
+## URLs de producción
 
-```bash
-export FQDN="controlmigratorio.institucion.cl"
-```
+- Frontend: `https://control-migratorio-frontend.onrender.com`
+- API: `https://control-migratorio-backend.onrender.com/api`
 
-Pasos:
+## Variables del backend
 
-```bash
-sudo apt update
-sudo apt install -y nginx certbot python3-certbot-nginx apache2-utils
-```
+Definidas en Render (`control-migratorio-backend`):
 
-Generar archivo final de Nginx con el dominio real:
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
+- `MAX_UPLOAD_SIZE_MB`
+- `NODE_ENV=production`
 
-```bash
-sed "s/__FQDN__/${FQDN}/g" deploy/nginx/control-migratorio.conf | sudo tee /etc/nginx/sites-available/control-migratorio.conf >/dev/null
-```
+## Configuración de build
 
-Instalar configuración:
+### Backend
 
-```bash
-sudo ln -sf /etc/nginx/sites-available/control-migratorio.conf /etc/nginx/sites-enabled/control-migratorio.conf
-sudo nginx -t
-sudo systemctl reload nginx
-```
+- Runtime: Node
+- Root Directory: `backend`
+- Build Command: `yarn && yarn build`
+- Start Command: `yarn start:prod`
+- Auto Deploy: `On Commit`
 
-Emitir certificado SSL:
+### Frontend
 
-```bash
-sudo certbot --nginx -d "$FQDN"
-```
+- Tipo: Static Site
+- Root Directory: `frontend`
+- Build Command: `yarn && yarn build`
+- Publish Directory: `dist/frontend/browser`
+- Auto Deploy: `On Commit`
 
-## 2) Backup diario (BD + storage)
+## Operación
 
-Scripts incluidos:
-- `deploy/backup/backup_bd_storage.sh`
-- `deploy/backup/instalar_cron_backup.sh`
-- `deploy/backup/backup.env.example`
-
-Dependencia para respaldar PostgreSQL:
-
-```bash
-sudo apt install -y postgresql-client
-```
-
-Configurar:
-
-```bash
-cp deploy/backup/backup.env.example deploy/backup/backup.env
-nano deploy/backup/backup.env
-chmod +x deploy/backup/backup_bd_storage.sh deploy/backup/instalar_cron_backup.sh
-```
-
-Probar backup manual:
-
-```bash
-./deploy/backup/backup_bd_storage.sh ./deploy/backup/backup.env
-```
-
-Instalar ejecución diaria a las 02:00:
-
-```bash
-./deploy/backup/instalar_cron_backup.sh
-```
-
-## 3) Restringir acceso (IP o credenciales fuertes)
-
-### Opción A: Restringir por IP (Nginx)
-
-Archivo incluido:
-- `deploy/nginx/control-migratorio-allowlist.conf`
-
-Pasos:
-
-```bash
-sudo cp deploy/nginx/control-migratorio-allowlist.conf /etc/nginx/snippets/control-migratorio-allowlist.conf
-sudo nano /etc/nginx/snippets/control-migratorio-allowlist.conf
-```
-
-Editar IPs permitidas (`allow ...;`) y dejar `deny all;`.
-
-Luego descomentar esta línea en `control-migratorio.conf`:
-
-```nginx
-include /etc/nginx/snippets/control-migratorio-allowlist.conf;
-```
-
-Aplicar:
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Opción B: Credenciales fuertes en acceso web (Basic Auth)
-
-Crear usuario de acceso:
-
-```bash
-sudo htpasswd -c /etc/nginx/.htpasswd-control-migratorio admin-acceso
-```
-
-Descomentar en `control-migratorio.conf`:
-
-```nginx
-auth_basic "Acceso restringido - Control Migratorio";
-auth_basic_user_file /etc/nginx/.htpasswd-control-migratorio;
-```
-
-Aplicar:
-
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## 4) Refuerzo a nivel backend (opcional)
-
-El backend ahora soporta:
-- `CORS_ORIGIN` (orígenes permitidos, separados por coma)
-- `ALLOWED_IPS` (IPs permitidas para API, separadas por coma)
-
-Ejemplo en `backend/.env`:
-
-```env
-CORS_ORIGIN="https://controlmigratorio.institucion.cl"
-ALLOWED_IPS="181.12.34.56,190.98.12.44"
-```
-
-Además, la política de contraseña fue endurecida para creación y reseteo de usuarios:
-- mínimo 10 caracteres
-- mayúscula
-- minúscula
-- número
-- símbolo
+- Cada `git push origin main` dispara deploy automático.
+- Si el backend queda inactivo en plan Free, Render lo reactiva al primer request.
+- Respaldar periódicamente:
+  1. Base de datos PostgreSQL (`pg_dump`)
+  2. Carpeta `storage/` (evidencias y documentos)
