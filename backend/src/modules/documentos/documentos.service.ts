@@ -38,6 +38,7 @@ export class DocumentosService {
         creadoPor: {
           select: {
             id: true,
+            run: true,
             nombreCompleto: true,
             rol: true,
           },
@@ -74,28 +75,22 @@ export class DocumentosService {
 
     await new Promise<void>((resolvePromise, rejectPromise) => {
       const doc = new PDFDocument({
-        margin: 36,
+        margin: 0,
         size: 'A4',
       });
 
       const stream = createWriteStream(rutaAbsoluta);
       doc.pipe(stream);
 
-      const mainColor = '#1f354a';
-      const borderColor = '#c9d4e3';
-      const textColor = '#1a1a1a';
-      const left = 36;
-      const top = 36;
+      const left = 46;
+      const top = 52;
       const contentWidth = doc.page.width - left * 2;
       const rightLimit = left + contentWidth;
+      const lineColor = '#000000';
       const principal =
         caso.personas.find((p) => p.tipoPersona === 'PRINCIPAL') ?? caso.personas[0];
       const menor = caso.personas.find((p) => p.tipoPersona === 'MENOR');
       const observacionesLimpias = this.limpiarObservacionesParaActa(caso.observaciones);
-      const conteoEvidencias = caso.evidencias.length;
-      const formato = caso.existenMenores
-        ? 'FORMATO CON MENOR DE EDAD'
-        : 'FORMATO MAYOR DE EDAD';
       let cursorY = top;
 
       const ensureSpace = (height: number) => {
@@ -107,261 +102,364 @@ export class DocumentosService {
         cursorY = top;
       };
 
-      const drawHeader = () => {
-        const headerHeight = 88;
-        ensureSpace(headerHeight + 6);
-        doc
-          .roundedRect(left, cursorY, contentWidth, headerHeight, 8)
-          .lineWidth(1)
-          .strokeColor(borderColor)
-          .stroke();
+      const valor = (texto?: string | null, fallback = '') =>
+        (texto ?? '').trim() || fallback;
+      const procesado = new Date(caso.fechaHoraProcedimiento);
+      const fechaIngreso = caso.fechaIngreso ? new Date(caso.fechaIngreso) : null;
+      const presentaLesiones = this.detectarLesiones(caso.estadoSalud);
 
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(9.5)
-          .fillColor(textColor)
-          .text('REPÚBLICA DE CHILE', left + 12, cursorY + 10, {
-            width: 180,
-          })
-          .font('Helvetica')
-          .fontSize(8.5)
-          .text('JAF “TARAPACÁ”', left + 12, cursorY + 24, { width: 180 })
-          .text('Puesto Mando FT “Tarapacá 76”', left + 12, cursorY + 36, {
-            width: 180,
-          });
-
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(18)
-          .fillColor(mainColor)
-          .text('ACTA DE CONTROL MIGRATORIO', left + 168, cursorY + 18, {
-            width: contentWidth - 180,
-            align: 'center',
-          });
-
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(8.5)
-          .fillColor('#31506a')
-          .text(formato, left + 170, cursorY + 48, {
-            width: contentWidth - 184,
-            align: 'center',
-          });
-
-        doc
-          .font('Helvetica')
-          .fontSize(9)
-          .fillColor(textColor)
-          .text(`Código: ${caso.codigo}`, rightLimit - 185, cursorY + 10, {
-            width: 170,
-            align: 'right',
-          })
-          .text(`Emitido: ${this.formatearFechaHora(new Date())}`, rightLimit - 185, cursorY + 23, {
-            width: 170,
-            align: 'right',
-          });
-
-        cursorY += headerHeight + 8;
+      const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
+        doc.moveTo(x1, y1).lineTo(x2, y2).strokeColor(lineColor).lineWidth(0.9).stroke();
       };
 
-      const writeRow = (label: string, value: string, x: number, y: number, width: number) => {
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(9.6)
-          .fillColor(textColor)
-          .text(`${label}: `, x, y, {
-            width,
-            continued: true,
-          })
-          .font('Helvetica')
-          .text(value || 'No registra', {
-            width,
-          });
-      };
-
-      const drawBox = (
-        title: string,
-        lines: Array<{ label: string; value: string }>,
-        heightHint?: number,
+      const drawFieldLine = (
+        fieldY: number,
+        label: string,
+        fieldValue: string,
+        options?: {
+          labelX?: number;
+          colonX?: number;
+          lineStartX?: number;
+          lineEndX?: number;
+        },
       ) => {
-        const baseHeight = heightHint ?? 34 + lines.length * 16;
-        ensureSpace(baseHeight + 6);
+        const labelX = options?.labelX ?? left + 8;
+        const colonX = options?.colonX ?? left + 176;
+        const lineStartX = options?.lineStartX ?? left + 192;
+        const lineEndX = options?.lineEndX ?? rightLimit - 2;
 
-        const startY = cursorY;
-        const innerX = left + 12;
-        const innerWidth = contentWidth - 24;
-        let lineY = startY + 24;
-
+        doc.font('Times-Roman').fontSize(11).fillColor(lineColor).text(label, labelX, fieldY);
+        doc.font('Times-Roman').fontSize(11).text(':', colonX, fieldY);
+        drawLine(lineStartX, fieldY + 14, lineEndX, fieldY + 14);
         doc
-          .roundedRect(left, startY, contentWidth, baseHeight, 8)
-          .lineWidth(1)
-          .strokeColor(borderColor)
-          .stroke();
-
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(10.8)
-          .fillColor(mainColor)
-          .text(title, innerX, startY + 8, {
-            width: innerWidth,
+          .font('Times-Roman')
+          .fontSize(11)
+          .fillColor(lineColor)
+          .text(fieldValue, lineStartX + 2, fieldY + 1, {
+            width: lineEndX - lineStartX - 6,
+            height: 14,
+            lineBreak: false,
           });
+      };
 
-        lines.forEach((line) => {
-          writeRow(line.label, line.value, innerX, lineY, innerWidth);
-          lineY = doc.y + 1.5;
+      const drawCheckOption = (
+        checkY: number,
+        label: string,
+        checked: boolean,
+        x: number,
+        width: number,
+      ) => {
+        doc.font('Times-Roman').fontSize(11).fillColor(lineColor).text(label, x, checkY);
+        const mark = checked ? 'X' : '';
+        doc
+          .font('Times-Bold')
+          .fontSize(13)
+          .text(mark, x + width - 28, checkY - 1, { width: 20, align: 'center' });
+        drawLine(x + width - 34, checkY + 13.5, x + width + 8, checkY + 13.5);
+      };
+
+      const drawCheckTitle = (checkY: number, label: string, x: number) => {
+        doc.font('Times-Roman').fontSize(11).fillColor(lineColor).text(label, x, checkY);
+      };
+
+      doc.font('Times-Roman').fillColor(lineColor);
+      drawLine(left + 2, cursorY + 2, left + 2, cursorY + 24);
+      doc
+        .font('Times-Roman')
+        .fontSize(12)
+        .text('REPÚBLICA DE CHILE', left + 20, cursorY, { width: 250, align: 'center' })
+        .text('JAF “TARAPACÁ”', left + 20, cursorY + 20, { width: 250, align: 'center' })
+        .text('Puesto Mando FT “Tarapacá 76”', left + 20, cursorY + 40, {
+          width: 250,
+          align: 'center',
         });
 
-        cursorY = Math.max(startY + baseHeight, lineY + 8);
-      };
+      doc
+        .font('Times-Bold')
+        .fontSize(16)
+        .text('ACTA DE CONTROL MIGRATORIO', left, cursorY + 74, {
+          width: contentWidth,
+          align: 'center',
+          underline: true,
+        });
 
-      drawHeader();
+      cursorY += 106;
 
-      drawBox('1. DATOS DEL PROCEDIMIENTO', [
-        { label: 'Tipo de control', value: this.etiquetaTipoControl(caso.tipoControl) },
-        {
-          label: 'Fecha y hora del procedimiento',
-          value: this.formatearFechaHora(caso.fechaHoraProcedimiento),
-        },
-        { label: 'Lugar', value: caso.lugar },
-        { label: 'Coordenadas', value: caso.coordenadas ?? 'No registra' },
-        {
-          label: 'Fecha de ingreso',
-          value: caso.fechaIngreso ? this.formatearFecha(caso.fechaIngreso) : 'No registra',
-        },
-      ]);
+      const tablaX = left;
+      const tablaY = cursorY;
+      const tablaHeight = 62;
+      const checkColWidth = 24;
+      const labelColWidth = (contentWidth - checkColWidth * 3) / 3;
+      const opcionesControl = [
+        { key: 'INGRESO', label: 'INGRESANDO A\nTERRITORIO\nNACIONAL' },
+        { key: 'EGRESO', label: 'EGRESANDO DE\nTERRITORIO NACIONAL' },
+        { key: 'TERRITORIO', label: 'EN TERRITORIO NACIONAL' },
+      ];
 
-      if (principal) {
-        drawBox('2. ANTECEDENTES PERSONALES', [
+      doc.rect(tablaX, tablaY, contentWidth, tablaHeight).lineWidth(0.9).strokeColor(lineColor).stroke();
+
+      let tableCursorX = tablaX;
+      opcionesControl.forEach((opcion) => {
+        doc.rect(tableCursorX, tablaY, checkColWidth, tablaHeight).stroke();
+        if (caso.tipoControl === opcion.key) {
+          doc
+            .font('Times-Bold')
+            .fontSize(16)
+            .text('X', tableCursorX + 6, tablaY + 20, {
+              width: checkColWidth - 12,
+              align: 'center',
+            });
+        }
+        tableCursorX += checkColWidth;
+        doc.rect(tableCursorX, tablaY, labelColWidth, tablaHeight).stroke();
+        doc
+          .font('Times-Roman')
+          .fontSize(8.8)
+          .text(opcion.label, tableCursorX + 4, tablaY + 9, {
+            width: labelColWidth - 8,
+            align: 'center',
+            lineGap: 0,
+          });
+        tableCursorX += labelColWidth;
+      });
+
+      cursorY += tablaHeight + 10;
+
+      doc
+        .font('Times-Roman')
+        .fontSize(12)
+        .text(
+          `En ${valor(caso.lugar, '___________')}, a las ${this.formatearHora(procesado)} hrs. del día ${String(
+            procesado.getDate(),
+          ).padStart(2, '0')} del mes de ${this.formatearMesAbreviadoMayuscula(
+            procesado,
+          )} del año ${procesado.getFullYear()}, se hace entrega de:`,
+          left,
+          cursorY,
           {
-            label: 'Nombres y apellidos',
-            value: `${principal.nombres} ${principal.apellidos}`.trim(),
+            width: contentWidth,
           },
-          { label: 'Nacionalidad', value: principal.nacionalidad },
-          {
-            label: 'Fecha de nacimiento y edad',
-            value: `${this.formatearFecha(principal.fechaNacimiento)} / ${principal.edad} años`,
-          },
-          { label: 'Lugar de nacimiento', value: principal.lugarNacimiento ?? 'No registra' },
-          { label: 'N° documento', value: principal.numeroDocumento },
-          { label: 'Profesión u oficio', value: principal.profesionOficio ?? 'No registra' },
-          { label: 'Estado civil', value: principal.estadoCivil ?? 'No registra' },
-          { label: 'Domicilio', value: principal.domicilio ?? 'No registra' },
-          {
-            label: 'Teléfono',
-            value: principal.telefono ?? 'No registra',
-          },
-        ]);
-      }
+        );
+      cursorY += 26;
+
+      doc.font('Times-Bold').fontSize(14).text('ANTECEDENTES PERSONALES:', left, cursorY);
+      cursorY += 16;
+
+      drawFieldLine(
+        cursorY,
+        'Nombres y apellidos',
+        valor(`${principal?.nombres ?? ''} ${principal?.apellidos ?? ''}`),
+      );
+      cursorY += 17;
+
+      drawFieldLine(cursorY, 'Nacionalidad', valor(principal?.nacionalidad), {
+        lineEndX: left + 327,
+      });
+      drawFieldLine(cursorY, 'Lugar de nacimiento', valor(principal?.lugarNacimiento), {
+        labelX: left + 338,
+        colonX: left + 446,
+        lineStartX: left + 460,
+      });
+      cursorY += 17;
+
+      drawFieldLine(cursorY, 'Fecha de nacimiento', valor(principal ? this.formatearFecha(principal.fechaNacimiento) : ''), {
+        lineEndX: left + 327,
+      });
+      drawFieldLine(cursorY, 'EDAD', valor(principal ? String(principal.edad) : ''), {
+        labelX: left + 338,
+        colonX: left + 390,
+        lineStartX: left + 404,
+      });
+      cursorY += 17;
+
+      drawFieldLine(cursorY, 'C.I. / DNI / PASAPORTE', valor(principal?.numeroDocumento));
+      cursorY += 17;
+
+      drawFieldLine(cursorY, 'Profesión u oficio', valor(principal?.profesionOficio), {
+        lineEndX: left + 367,
+      });
+      drawFieldLine(cursorY, 'Estado civil', valor(principal?.estadoCivil), {
+        labelX: left + 370,
+        colonX: left + 450,
+        lineStartX: left + 464,
+      });
+      cursorY += 17;
+
+      drawFieldLine(cursorY, 'Domicilio', valor(principal?.domicilio));
+      cursorY += 17;
+      drawFieldLine(cursorY, 'Correo electrónico', valor(principal?.correo));
+      cursorY += 17;
+      drawFieldLine(cursorY, 'Teléfono', valor(principal?.telefono));
+      cursorY += 22;
 
       if (caso.existenMenores && menor) {
-        drawBox('3. ANTECEDENTES DEL MENOR', [
-          {
-            label: 'Nombres y apellidos',
-            value: `${menor.nombres} ${menor.apellidos}`.trim(),
-          },
-          { label: 'Nacionalidad', value: menor.nacionalidad },
-          {
-            label: 'Fecha de nacimiento y edad',
-            value: `${this.formatearFecha(menor.fechaNacimiento)} / ${menor.edad} años`,
-          },
-          { label: 'Ciudad de origen', value: menor.lugarNacimiento ?? 'No registra' },
-          { label: 'Documento', value: menor.numeroDocumento },
-        ]);
+        doc.font('Times-Bold').fontSize(12).text('01 ANTECEDENTES MENOR:', left, cursorY);
+        cursorY += 15;
+
+        drawFieldLine(cursorY, 'Nombre y apellidos', valor(`${menor.nombres} ${menor.apellidos}`));
+        cursorY += 16;
+        drawFieldLine(cursorY, 'F./Nacimiento', valor(this.formatearFecha(menor.fechaNacimiento)), {
+          lineEndX: left + 244,
+        });
+        drawFieldLine(cursorY, 'Edad', valor(String(menor.edad)), {
+          labelX: left + 256,
+          colonX: left + 308,
+          lineStartX: left + 320,
+          lineEndX: rightLimit - 2,
+        });
+        cursorY += 16;
+        drawFieldLine(cursorY, 'Nacionalidad', valor(menor.nacionalidad), {
+          lineEndX: left + 327,
+        });
+        drawFieldLine(cursorY, 'Ciudad de origen', valor(menor.lugarNacimiento), {
+          labelX: left + 338,
+          colonX: left + 446,
+          lineStartX: left + 460,
+        });
+        cursorY += 16;
+        drawFieldLine(cursorY, 'Acta Nac. o céd. Id.', valor(menor.numeroDocumento));
+        cursorY += 18;
       }
 
-      drawBox(
-        caso.existenMenores ? '4. ANTECEDENTES MIGRATORIOS' : '3. ANTECEDENTES MIGRATORIOS',
-        [
-          { label: 'Documentado', value: caso.documentado ? 'Sí' : 'No' },
-          { label: 'Estado de salud', value: caso.estadoSalud ?? 'Sin información' },
-          {
-            label: 'Derivación automática',
-            value: this.etiquetaInstitucion(caso.institucionDerivacion),
-          },
-          {
-            label: 'Estado inicial',
-            value: this.etiquetaEstado(caso.estado),
-          },
-        ],
-      );
+      doc.font('Times-Bold').fontSize(14).text('ANTECEDENTES MIGRATORIOS:', left, cursorY);
+      cursorY += 16;
 
-      const conteoPorTipo = {
-        foto: caso.evidencias.filter((e) => e.tipoEvidencia === 'FOTO_PERSONA').length,
-        documento: caso.evidencias.filter((e) => e.tipoEvidencia === 'DOCUMENTO_IDENTIDAD')
-          .length,
-        adjunto: caso.evidencias.filter((e) => e.tipoEvidencia === 'ADJUNTO_GENERAL').length,
+      drawFieldLine(cursorY, 'Lugar', valor(caso.lugar), {
+        lineEndX: left + 323,
+      });
+      drawFieldLine(
+        cursorY,
+        'Fecha de ingreso',
+        valor(fechaIngreso ? this.formatearFecha(fechaIngreso) : ''),
+        {
+          labelX: left + 314,
+          colonX: left + 423,
+          lineStartX: left + 437,
+        },
+      );
+      cursorY += 17;
+      drawFieldLine(cursorY, 'Coordenadas', valor(caso.coordenadas));
+      cursorY += 30;
+
+      drawCheckTitle(cursorY, 'Documentado', left + 8);
+      drawCheckOption(cursorY, 'SI', caso.documentado, left + 186, 78);
+      drawCheckOption(cursorY, 'NO', !caso.documentado, left + 268, 78);
+      cursorY += 28;
+
+      doc.font('Times-Bold').fontSize(14).text('ESTADO DE SALUD', left + 8, cursorY - 2);
+      cursorY += 16;
+      drawCheckTitle(cursorY, 'Presenta lesiones', left + 8);
+      drawCheckOption(cursorY, 'SI', presentaLesiones, left + 186, 78);
+      drawCheckOption(cursorY, 'NO', !presentaLesiones, left + 268, 78);
+      cursorY += 22;
+
+      doc.font('Times-Bold').fontSize(14).text('OBSERVACIONES', left + 8, cursorY);
+      cursorY += 18;
+
+      const obsBoxHeight = 42;
+      doc.rect(left, cursorY, contentWidth, obsBoxHeight).lineWidth(0.9).strokeColor(lineColor).stroke();
+      doc
+        .font('Times-Roman')
+        .fontSize(10.4)
+        .text(valor(observacionesLimpias, ''), left + 6, cursorY + 5, {
+          width: contentWidth - 12,
+          height: obsBoxHeight - 10,
+        });
+      cursorY += obsBoxHeight + 2;
+
+      const conformidadHeight = 78;
+      doc.rect(left, cursorY, contentWidth, conformidadHeight).lineWidth(0.9).strokeColor(lineColor).stroke();
+      doc
+        .font('Times-Roman')
+        .fontSize(12)
+        .text(
+          'TOMA CONOCIMIENTO BAJO FIRMA, QUE SEGÚN EL ACUERDO INTERINTITUCIONAL DE COOPERACIÓN MIGRATORIA ENTRE EL MINISTERIO DEL INTERIOR Y SEGURIDAD PÚBLICA Y EL MINISTERIO DE GOBIERNO DEL ESTADO PLURINACIONAL DE BOLIVIA DEL 20 DE DICIEMBRE DEL 2024, SERÁ RETORNADO A BOLIVIA.',
+          left + 8,
+          cursorY + 8,
+          {
+            width: contentWidth - 16,
+            align: 'justify',
+            lineGap: 1,
+          },
+        );
+      cursorY += conformidadHeight + 4;
+
+      const consultadoHeight = 18;
+      doc.rect(left, cursorY, contentWidth, consultadoHeight).lineWidth(0.9).strokeColor(lineColor).stroke();
+      doc
+        .font('Times-Bold')
+        .fontSize(11)
+        .text('CONSULTADO A PDI', left + 8, cursorY + 2, { width: 160 });
+      cursorY += consultadoHeight + 6;
+
+      drawFieldLine(cursorY, 'Firma en conformidad', valor('', ''), {
+        labelX: left + 8,
+        lineStartX: left + 164,
+      });
+      cursorY += 16;
+      drawFieldLine(cursorY, 'Nombre y apellidos', valor(`${principal?.nombres ?? ''} ${principal?.apellidos ?? ''}`), {
+        labelX: left + 8,
+        lineStartX: left + 164,
+      });
+      cursorY += 16;
+      drawFieldLine(cursorY, 'Cédula o pasaporte', valor(principal?.numeroDocumento), {
+        labelX: left + 8,
+        lineStartX: left + 164,
+      });
+      cursorY += 22;
+
+      const firmaBlockWidth = (contentWidth - 16) / 2;
+      const receptor = caso.existenMenores
+        ? 'FUNCIONARIO QUE RECIBE/ENTREGA DE CARABINEROS'
+        : 'FUNCIONARIO QUE RECIBE/ENTREGA DE PDI';
+      const leftSignX = left;
+      const rightSignX = left + firmaBlockWidth + 16;
+
+      doc
+        .font('Times-Bold')
+        .fontSize(10.5)
+        .text('FUNCIONARIO DE EJÉRCITO QUE ENTREGA', leftSignX + 6, cursorY, {
+          width: firmaBlockWidth - 12,
+          align: 'center',
+        });
+      doc
+        .font('Times-Bold')
+        .fontSize(10.5)
+        .text(receptor, rightSignX + 6, cursorY, {
+          width: firmaBlockWidth - 12,
+          align: 'center',
+        });
+      cursorY += 14;
+
+      const drawFirmaSet = (baseX: number, nombreFunc: string) => {
+        drawFieldLine(cursorY, 'Firma', '', {
+          labelX: baseX + 8,
+          colonX: baseX + 54,
+          lineStartX: baseX + 66,
+          lineEndX: baseX + firmaBlockWidth - 6,
+        });
+        drawFieldLine(cursorY + 15, 'Nombre', valor(nombreFunc), {
+          labelX: baseX + 8,
+          colonX: baseX + 54,
+          lineStartX: baseX + 66,
+          lineEndX: baseX + firmaBlockWidth - 6,
+        });
+        drawFieldLine(cursorY + 30, 'Grado', '', {
+          labelX: baseX + 8,
+          colonX: baseX + 54,
+          lineStartX: baseX + 66,
+          lineEndX: baseX + firmaBlockWidth - 6,
+        });
+        drawFieldLine(cursorY + 45, 'Unidad', '', {
+          labelX: baseX + 8,
+          colonX: baseX + 54,
+          lineStartX: baseX + 66,
+          lineEndX: baseX + firmaBlockWidth - 6,
+        });
       };
 
-      drawBox(
-        caso.existenMenores ? '5. EVIDENCIAS' : '4. EVIDENCIAS',
-        [
-          { label: 'Total evidencias', value: String(conteoEvidencias) },
-          { label: 'Foto persona', value: String(conteoPorTipo.foto) },
-          { label: 'Documento identidad', value: String(conteoPorTipo.documento) },
-          { label: 'Adjuntos generales', value: String(conteoPorTipo.adjunto) },
-        ],
-        112,
-      );
-
-      const tituloObs = caso.existenMenores
-        ? '6. OBSERVACIONES Y CONFORMIDAD'
-        : '5. OBSERVACIONES Y CONFORMIDAD';
-      const obsHeight = 120;
-      ensureSpace(obsHeight + 6);
-      doc
-        .roundedRect(left, cursorY, contentWidth, obsHeight, 8)
-        .lineWidth(1)
-        .strokeColor(borderColor)
-        .stroke();
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(10.8)
-        .fillColor(mainColor)
-        .text(tituloObs, left + 12, cursorY + 8, { width: contentWidth - 24 });
-      doc
-        .font('Helvetica')
-        .fontSize(9.5)
-        .fillColor(textColor)
-        .text(observacionesLimpias || 'Sin observaciones registradas.', left + 12, cursorY + 28, {
-          width: contentWidth - 24,
-          height: 60,
-        });
-      cursorY += obsHeight + 8;
-
-      const rutaMensaje = caso.existenMenores
-        ? 'Ruta del procedimiento: Carabineros → PDI.'
-        : 'Ruta del procedimiento: derivación directa a PDI.';
-      const footerHeight = 86;
-      ensureSpace(footerHeight + 4);
-      doc
-        .roundedRect(left, cursorY, contentWidth, footerHeight, 8)
-        .lineWidth(1)
-        .strokeColor(borderColor)
-        .stroke();
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(10)
-        .fillColor(mainColor)
-        .text(rutaMensaje, left + 12, cursorY + 10, { width: contentWidth - 24 });
-      doc
-        .font('Helvetica')
-        .fontSize(10)
-        .fillColor(textColor)
-        .text(`Funcionario responsable: ${caso.creadoPor.nombreCompleto}`, left + 12, cursorY + 30);
-      doc
-        .moveTo(left + 12, cursorY + 58)
-        .lineTo(left + 240, cursorY + 58)
-        .strokeColor('#555')
-        .stroke();
-      doc
-        .moveTo(left + 280, cursorY + 58)
-        .lineTo(rightLimit - 12, cursorY + 58)
-        .strokeColor('#555')
-        .stroke();
-      doc
-        .fontSize(9)
-        .text('Firma', left + 12, cursorY + 62)
-        .text('Aclaración', left + 280, cursorY + 62);
+      drawFirmaSet(leftSignX, caso.creadoPor.nombreCompleto);
+      drawFirmaSet(rightSignX, '');
 
       doc.end();
 
@@ -411,11 +509,77 @@ export class DocumentosService {
   }
 
   private formatearFechaHora(fecha: Date | string): string {
-    return new Date(fecha).toLocaleString('es-CL');
+    const fechaValida = this.parseFecha(fecha);
+    if (!fechaValida) {
+      return '';
+    }
+
+    return fechaValida.toLocaleString('es-CL');
   }
 
   private formatearFecha(fecha: Date | string): string {
-    return new Date(fecha).toLocaleDateString('es-CL');
+    const fechaValida = this.parseFecha(fecha);
+    if (!fechaValida) {
+      return '';
+    }
+
+    const dia = String(fechaValida.getUTCDate()).padStart(2, '0');
+    const mes = String(fechaValida.getUTCMonth() + 1).padStart(2, '0');
+    const ano = fechaValida.getUTCFullYear();
+
+    return `${dia}-${mes}-${ano}`;
+  }
+
+  private formatearHora(fecha: Date | string): string {
+    const fechaValida = this.parseFecha(fecha);
+    if (!fechaValida) {
+      return '';
+    }
+
+    return fechaValida.toLocaleTimeString('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+
+  private formatearMesAbreviadoMayuscula(fecha: Date | string): string {
+    const fechaValida = this.parseFecha(fecha);
+    if (!fechaValida) {
+      return '';
+    }
+
+    return fechaValida
+      .toLocaleDateString('es-CL', { month: 'short' })
+      .replace('.', '')
+      .trim()
+      .toUpperCase();
+  }
+
+  private parseFecha(fecha: Date | string): Date | null {
+    const parsed = new Date(fecha);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return parsed;
+  }
+
+  private detectarLesiones(estadoSalud: string | null | undefined): boolean {
+    if (!estadoSalud) {
+      return false;
+    }
+
+    const normalizado = estadoSalud
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    if (normalizado.includes('sin lesion')) {
+      return false;
+    }
+
+    return normalizado.includes('lesion');
   }
 
   private limpiarObservacionesParaActa(observaciones: string | null | undefined): string {

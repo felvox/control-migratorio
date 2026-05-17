@@ -17,6 +17,7 @@ import {
   TipoEvidencia,
 } from '../../core/models/caso.model';
 import { CasosService } from './casos.service';
+import { AlertModalComponent } from '../../shared/components/alert-modal.component';
 
 type TipoActa = 'MAYOR' | 'CON_MENOR';
 type GuardadoAccion = 'GUARDAR' | 'GUARDAR_Y_PDF';
@@ -37,7 +38,7 @@ interface PasoFormulario {
 @Component({
   selector: 'app-caso-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AlertModalComponent],
   template: `
     <div class="page-grid caso-form-shell">
       <form [formGroup]="form" (ngSubmit)="guardar()" class="page-grid">
@@ -56,7 +57,7 @@ interface PasoFormulario {
                   {{ esActaConMenor ? 'Formato con menor de edad' : 'Formato mayor de edad' }}
                 </span>
                 <button
-                  *ngIf="!modoEdicion"
+                  *ngIf="!modoEdicion && pasoActual === 'procedimiento'"
                   type="button"
                   class="btn-secondary btn-sm"
                   (click)="abrirModalTipoActa()"
@@ -253,15 +254,15 @@ interface PasoFormulario {
           <section class="sheet-section" *ngIf="pasoActual === 'antecedentes_migratorios'">
             <h4>{{ esActaConMenor ? '4' : '3' }}. ANTECEDENTES MIGRATORIOS</h4>
 
-            <div class="form-grid">
-              <div>
+            <div class="migratorio-grid">
+              <div class="migratorio-item">
                 <label>Fecha de ingreso</label>
                 <input type="date" formControlName="fechaIngreso" />
               </div>
 
-              <div class="radio-field">
+              <div class="radio-field migratorio-item">
                 <label>Documentado</label>
-                <div class="radio-group">
+                <div class="radio-group radio-group-compact">
                   <label
                     class="radio-chip"
                     [class.radio-chip-active]="form.get('documentado')?.value === true"
@@ -279,9 +280,9 @@ interface PasoFormulario {
                 </div>
               </div>
 
-              <div class="radio-field">
+              <div class="radio-field migratorio-item">
                 <label>Presenta lesiones</label>
-                <div class="radio-group">
+                <div class="radio-group radio-group-compact">
                   <label
                     class="radio-chip"
                     [class.radio-chip-active]="form.get('presentaLesiones')?.value === true"
@@ -299,9 +300,9 @@ interface PasoFormulario {
                 </div>
               </div>
 
-              <div>
+              <div class="migratorio-item migratorio-item-salud">
                 <label>Estado de salud (detalle)</label>
-                <input formControlName="estadoSalud" placeholder="Detalle clínico o condición observada" />
+                <input formControlName="estadoSalud" [placeholder]="placeholderEstadoSalud" />
               </div>
             </div>
           </section>
@@ -590,35 +591,21 @@ interface PasoFormulario {
         </section>
       </div>
 
-      <div class="alert-backdrop" *ngIf="alertExitoAbierto">
-        <section class="alert-card" role="alertdialog" aria-modal="true" aria-label="Notificación">
-          <div class="alert-icon" aria-hidden="true">✓</div>
-          <div class="alert-content">
-            <h4>Operación completada</h4>
-            <p>{{ alertaExitoMensaje }}</p>
-          </div>
-          <div class="alert-actions">
-            <button type="button" class="btn-primary" (click)="cerrarAlertaExito()">
-              Aceptar
-            </button>
-          </div>
-        </section>
-      </div>
+      <app-alert-modal
+        [open]="alertExitoAbierto"
+        title="Operación completada"
+        [message]="alertaExitoMensaje"
+        variant="success"
+        (accepted)="cerrarAlertaExito()"
+      />
 
-      <div class="alert-backdrop" *ngIf="alertAvisoAbierto">
-        <section class="alert-card alert-card-warning" role="alertdialog" aria-modal="true" aria-label="Aviso">
-          <div class="alert-icon alert-icon-warning" aria-hidden="true">!</div>
-          <div class="alert-content">
-            <h4>Aviso</h4>
-            <p>{{ alertaAvisoMensaje }}</p>
-          </div>
-          <div class="alert-actions">
-            <button type="button" class="btn-primary" (click)="cerrarAlertaAviso()">
-              Aceptar
-            </button>
-          </div>
-        </section>
-      </div>
+      <app-alert-modal
+        [open]="alertAvisoAbierto"
+        title="Aviso"
+        [message]="alertaAvisoMensaje"
+        variant="warning"
+        (accepted)="cerrarAlertaAviso()"
+      />
     </div>
   `,
   styles: [
@@ -712,19 +699,19 @@ interface PasoFormulario {
 
       .wizard-step {
         flex: 0 0 auto;
-        border: 1px solid #c4d3e5;
-        background: #f6f9fd;
+        border: 1px solid #efbcc4;
+        background: #fff3f6;
         border-radius: 999px;
         padding: 0.35rem 0.68rem;
         display: inline-flex;
         align-items: center;
         gap: 0.42rem;
-        color: #28435f;
+        color: #8a4252;
         transition: all 180ms ease;
       }
 
       .wizard-step:not(.wizard-step-active):not(.wizard-step-done) {
-        opacity: 0.78;
+        opacity: 1;
       }
 
       .wizard-step-index {
@@ -735,8 +722,9 @@ interface PasoFormulario {
         place-items: center;
         font-size: 0.75rem;
         font-weight: 700;
-        border: 1px solid #b9ccdf;
-        background: #ffffff;
+        border: 1px solid #efbcc4;
+        background: #fff7f8;
+        color: #8a4252;
       }
 
       .wizard-step-title {
@@ -763,14 +751,14 @@ interface PasoFormulario {
       }
 
       .wizard-step-done {
-        border-color: #8cb3d4;
-        background: #edf5fb;
-        color: #1c4b72;
+        border-color: #a9d8bb;
+        background: #edf9f1;
+        color: #246846;
       }
 
       .wizard-step-done .wizard-step-index {
-        border-color: #2e6f9c;
-        background: #2e6f9c;
+        border-color: #2f8f5f;
+        background: #2f8f5f;
         color: #ffffff;
       }
 
@@ -932,10 +920,32 @@ interface PasoFormulario {
         gap: 0.35rem;
       }
 
+      .migratorio-grid {
+        display: grid;
+        grid-template-columns: minmax(220px, 1.2fr) minmax(190px, 1fr) minmax(190px, 1fr);
+        gap: 0.75rem;
+        align-items: start;
+      }
+
+      .migratorio-item {
+        display: grid;
+        gap: 0.35rem;
+      }
+
+      .migratorio-item-salud {
+        grid-column: 1 / -1;
+      }
+
       .radio-group {
         display: flex;
         gap: 0.45rem;
         flex-wrap: wrap;
+      }
+
+      .radio-group-compact .radio-chip {
+        min-width: 72px;
+        justify-content: center;
+        padding: 0.42rem 0.68rem;
       }
 
       .radio-chip {
@@ -1155,64 +1165,6 @@ interface PasoFormulario {
         justify-content: flex-end;
       }
 
-      .alert-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(10, 21, 34, 0.36);
-        display: grid;
-        place-items: center;
-        padding: 1rem;
-        z-index: 1400;
-      }
-
-      .alert-card {
-        width: min(520px, 100%);
-        background: #fff;
-        border: 1px solid #d4dee9;
-        border-radius: 14px;
-        box-shadow: 0 12px 28px rgba(10, 29, 54, 0.22);
-        padding: 0.95rem;
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 0.85rem;
-        align-items: center;
-      }
-
-      .alert-icon {
-        width: 2.1rem;
-        height: 2.1rem;
-        border-radius: 999px;
-        display: grid;
-        place-items: center;
-        background: #0d9f6e;
-        color: #fff;
-        font-weight: 800;
-      }
-
-      .alert-content h4 {
-        margin: 0;
-        color: #1e2f42;
-      }
-
-      .alert-content p {
-        margin: 0.15rem 0 0;
-        color: #4c6076;
-        font-size: 0.92rem;
-      }
-
-      .alert-actions {
-        display: flex;
-        align-items: center;
-      }
-
-      .alert-card-warning {
-        border-color: #e8d2a4;
-      }
-
-      .alert-icon-warning {
-        background: #d17a00;
-      }
-
       @media (max-width: 1080px) {
         .sheet-header {
           grid-template-columns: 1fr;
@@ -1225,6 +1177,14 @@ interface PasoFormulario {
 
         .control-radio-grid {
           grid-template-columns: 1fr;
+        }
+
+        .migratorio-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .migratorio-item-salud {
+          grid-column: auto;
         }
       }
 
@@ -1430,6 +1390,13 @@ export class CasoFormComponent implements OnInit {
   get anioProcedimientoTexto(): string {
     const fecha = this.obtenerFechaProcedimiento();
     return fecha ? String(fecha.getFullYear()) : '----';
+  }
+
+  get placeholderEstadoSalud(): string {
+    const presentaLesiones = this.form.get('presentaLesiones')?.value === true;
+    return presentaLesiones
+      ? 'Ej: Lesión superficial / condición observada'
+      : 'Ej: Sin lesiones observables';
   }
 
   get indicesTodasLasPersonas(): number[] {
@@ -2069,31 +2036,7 @@ export class CasoFormComponent implements OnInit {
 
   private construirObservacionesFinal(observacionesRaw: string): string | undefined {
     const observacionesBase = this.extraerObservacionesBase(observacionesRaw);
-    const tomaConocimiento = this.form.get('tomaConocimiento')?.value === true;
-
-    if (!tomaConocimiento) {
-      return observacionesBase || undefined;
-    }
-
-    const sello = this.generarSelloConformidad();
-    const contenido = [observacionesBase, sello].filter((item) => item.trim().length > 0);
-
-    return contenido.length > 0 ? contenido.join('\n\n') : undefined;
-  }
-
-  private generarSelloConformidad(): string {
-    const usuario = this.authService.currentUser;
-    const ahora = new Date();
-    const fecha = ahora.toLocaleString('es-CL', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-
-    return `${this.marcadorConformidad} ${fecha} | usuario_id: ${usuario?.id ?? 'N/D'} | run: ${usuario?.run ?? 'N/D'} | funcionario: ${usuario?.nombreCompleto ?? 'N/D'}`;
+    return observacionesBase || undefined;
   }
 
   private extraerObservacionesBase(observaciones: string | null | undefined): string {

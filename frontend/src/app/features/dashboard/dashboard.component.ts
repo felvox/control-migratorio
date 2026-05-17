@@ -1058,8 +1058,21 @@ export class DashboardComponent implements OnInit {
   }
 
   private tieneLesion(estadoSalud?: string | null): boolean {
-    const text = (estadoSalud ?? '').toLowerCase();
-    return text.includes('lesion') || text.includes('lesión');
+    const text = (estadoSalud ?? '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+    if (!text) {
+      return false;
+    }
+
+    if (text.includes('sin lesion') || text.includes('no presenta lesion')) {
+      return false;
+    }
+
+    return text.includes('lesion');
   }
 
   get filasTabla(): FilaCaso[] {

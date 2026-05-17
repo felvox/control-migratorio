@@ -260,17 +260,51 @@ export class DashboardService {
         this.prisma.caso.count({
           where: {
             ...whereHastaFecha,
-            OR: [
+            AND: [
               {
-                estadoSalud: {
-                  contains: 'lesion',
-                  mode: 'insensitive',
-                },
+                OR: [
+                  {
+                    estadoSalud: {
+                      contains: 'lesion',
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    estadoSalud: {
+                      contains: 'lesión',
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
               },
               {
-                estadoSalud: {
-                  contains: 'lesión',
-                  mode: 'insensitive',
+                NOT: {
+                  OR: [
+                    {
+                      estadoSalud: {
+                        contains: 'sin lesion',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      estadoSalud: {
+                        contains: 'sin lesión',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      estadoSalud: {
+                        contains: 'no presenta lesion',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      estadoSalud: {
+                        contains: 'no presenta lesión',
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
                 },
               },
             ],

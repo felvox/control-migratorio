@@ -4,13 +4,14 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { UsuarioListado, UsuariosService } from './usuarios.service';
 import { formatRunForDisplay, formatRunForInput } from '../../core/utils/run.util';
+import { AlertModalComponent } from '../../shared/components/alert-modal.component';
 
 type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' | null;
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, AlertModalComponent],
   template: `
     <div class="page-grid usuarios-page">
       <article class="card acciones-card">
@@ -278,18 +279,13 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
         </section>
       </div>
 
-      <div class="alert-backdrop" *ngIf="alertExitoAbierto">
-        <section class="alert-card" role="alertdialog" aria-modal="true" aria-label="Notificación">
-          <div class="alert-icon" aria-hidden="true">✓</div>
-          <div class="alert-content">
-            <h4>Operación completada</h4>
-            <p>{{ alertaExitoMensaje }}</p>
-          </div>
-          <div class="alert-actions">
-            <button type="button" class="btn-primary" (click)="cerrarAlertaExito()">Aceptar</button>
-          </div>
-        </section>
-      </div>
+      <app-alert-modal
+        [open]="alertExitoAbierto"
+        title="Operación completada"
+        [message]="alertaExitoMensaje"
+        variant="success"
+        (accepted)="cerrarAlertaExito()"
+      />
     </div>
   `,
   styles: [
@@ -526,54 +522,6 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
         display: flex;
         justify-content: flex-end;
         gap: 0.45rem;
-      }
-
-      .alert-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(10, 21, 34, 0.45);
-        display: grid;
-        place-items: center;
-        padding: 1rem;
-        z-index: 1300;
-      }
-
-      .alert-card {
-        width: min(420px, 100%);
-        background: #ffffff;
-        border: 1px solid #d7e0ea;
-        border-radius: 12px;
-        box-shadow: 0 18px 48px rgba(10, 29, 54, 0.24);
-        padding: 1rem;
-        display: grid;
-        gap: 0.75rem;
-      }
-
-      .alert-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        display: grid;
-        place-items: center;
-        background: #e8f6ee;
-        color: #1c7a4a;
-        font-weight: 700;
-      }
-
-      .alert-content h4 {
-        margin: 0;
-        font-size: 1.03rem;
-        color: #1f3146;
-      }
-
-      .alert-content p {
-        margin: 0.3rem 0 0;
-        color: #4c6178;
-      }
-
-      .alert-actions {
-        display: flex;
-        justify-content: flex-end;
       }
 
       @media (max-width: 860px) {

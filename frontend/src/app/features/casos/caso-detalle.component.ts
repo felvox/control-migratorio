@@ -1,11 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { CasosService } from './casos.service';
 import {
   Caso,
-  DocumentoGenerado,
   Evidencia,
 } from '../../core/models/caso.model';
 import { AuthService } from '../../core/services/auth.service';
@@ -13,11 +11,14 @@ import { AuthService } from '../../core/services/auth.service';
 @Component({
   selector: 'app-caso-detalle',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, RouterLink],
   template: `
     <div class="page-grid" *ngIf="caso">
       <div class="header-row">
         <div style="display: flex; gap: 0.5rem;">
+          <button class="btn-primary" *ngIf="puedeEditar" (click)="generarActa()">
+            Generar PDF
+          </button>
           <button
             class="btn-secondary"
             *ngIf="puedeEditar"
@@ -33,15 +34,16 @@ import { AuthService } from '../../core/services/auth.service';
         <h3>Resumen</h3>
         <p><strong>Código:</strong> {{ caso.codigo }}</p>
         <p>
-          <strong>Estado:</strong> {{ caso.estado }} | <strong>Derivación:</strong>
-          {{ caso.institucionDerivacion }}
+          <strong>Creado por:</strong> {{ caso.creadoPor.nombreCompleto || 'No disponible' }}
+          | <strong>Creado el:</strong> {{ caso.creadoAt | date: 'dd/MM/yyyy HH:mm' }}
         </p>
+        <p><strong>Estado:</strong> {{ etiquetaEstado(caso.estado) }}</p>
         <p>
           <strong>Tipo de control:</strong> {{ caso.tipoControl }} | <strong>Fecha:</strong>
           {{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}
         </p>
         <p><strong>Lugar:</strong> {{ caso.lugar }}</p>
-        <p><strong>Observaciones:</strong> {{ caso.observaciones || 'Sin observaciones' }}</p>
+        <p><strong>Observaciones:</strong> {{ observacionesLimpias || 'Sin observaciones' }}</p>
       </article>
 
       <article class="card">
@@ -71,72 +73,7 @@ import { AuthService } from '../../core/services/auth.service';
       </article>
 
       <article class="card">
-        <div class="header-row">
-          <h3>Documentos generados</h3>
-          <button class="btn-primary" *ngIf="puedeEditar" (click)="generarActa()">
-            Generar acta PDF
-          </button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Fecha</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let doc of documentos">
-                <td>{{ doc.nombreOriginal }}</td>
-                <td>{{ doc.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
-                <td>
-                  <button class="btn-secondary" (click)="descargarDocumento(doc)">
-                    Descargar
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      <article class="card">
         <h3>Evidencias</h3>
-
-        <form
-          *ngIf="puedeEditar"
-          [formGroup]="evidenciaForm"
-          class="form-grid"
-          (ngSubmit)="subirEvidencia()"
-        >
-          <div>
-            <label>Tipo de evidencia</label>
-            <select formControlName="tipoEvidencia">
-              <option value="FOTO_PERSONA">Foto persona</option>
-              <option value="DOCUMENTO_IDENTIDAD">Documento identidad</option>
-              <option value="ADJUNTO_GENERAL">Adjunto general</option>
-            </select>
-          </div>
-          <div>
-            <label>Persona asociada (opcional)</label>
-            <select formControlName="personaId">
-              <option value="">Sin persona</option>
-              <option *ngFor="let p of caso.personas" [value]="p.id">
-                {{ p.nombres }} {{ p.apellidos }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label>Archivo</label>
-            <input type="file" (change)="onArchivoChange($event)" />
-          </div>
-          <div style="align-self: end;">
-            <button class="btn-primary" [disabled]="!archivoSeleccionado">
-              Subir evidencia
-            </button>
-          </div>
-        </form>
 
         <div class="table-wrap">
           <table>
@@ -186,20 +123,17 @@ export class CasoDetalleComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly casosService = inject(CasosService);
   private readonly authService = inject(AuthService);
-  private readonly fb = inject(FormBuilder);
+  private readonly marcadorConformidad = '[CONFORMIDAD_SISTEMA]';
 
   caso: Caso | null = null;
   evidencias: Evidencia[] = [];
-  documentos: DocumentoGenerado[] = [];
-  archivoSeleccionado: File | null = null;
-
-  readonly evidenciaForm = this.fb.group({
-    tipoEvidencia: ['ADJUNTO_GENERAL'],
-    personaId: [''],
-  });
 
   get puedeEditar(): boolean {
     return this.authService.hasRole(['ADMINISTRADOR', 'OPERADOR']);
+  }
+
+  get observacionesLimpias(): string {
+    return this.extraerObservacionesBase(this.caso?.observaciones);
   }
 
   ngOnInit(): void {
@@ -215,34 +149,6 @@ export class CasoDetalleComponent implements OnInit {
     this.casosService.obtenerPorId(id).subscribe((caso) => {
       this.caso = caso;
       this.cargarEvidencias();
-      this.cargarDocumentos();
-    });
-  }
-
-  onArchivoChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.archivoSeleccionado = input.files?.[0] ?? null;
-  }
-
-  subirEvidencia(): void {
-    if (!this.caso || !this.archivoSeleccionado) {
-      return;
-    }
-
-    const payload = this.evidenciaForm.getRawValue();
-
-    const formData = new FormData();
-    formData.append('archivo', this.archivoSeleccionado);
-    formData.append('tipoEvidencia', payload.tipoEvidencia ?? 'ADJUNTO_GENERAL');
-
-    if (payload.personaId) {
-      formData.append('personaId', payload.personaId);
-    }
-
-    this.casosService.subirEvidencia(this.caso.id, formData).subscribe(() => {
-      this.archivoSeleccionado = null;
-      this.evidenciaForm.patchValue({ personaId: '' });
-      this.cargarEvidencias();
     });
   }
 
@@ -256,29 +162,15 @@ export class CasoDetalleComponent implements OnInit {
     });
   }
 
-  cargarDocumentos(): void {
-    if (!this.caso) {
-      return;
-    }
-
-    this.casosService.listarDocumentos(this.caso.id).subscribe((items) => {
-      this.documentos = items;
-    });
-  }
-
   generarActa(): void {
     if (!this.caso) {
       return;
     }
 
-    this.casosService.generarActaPdf(this.caso.id).subscribe(() => {
-      this.cargarDocumentos();
-    });
-  }
-
-  descargarDocumento(doc: DocumentoGenerado): void {
-    this.casosService.descargarDocumento(doc.id).subscribe((blob) => {
-      this.descargarBlob(blob, doc.nombreOriginal);
+    this.casosService.generarActaPdf(this.caso.id).subscribe((doc) => {
+      this.casosService.descargarDocumento(doc.id).subscribe((blob) => {
+        this.descargarBlob(blob, doc.nombreOriginal);
+      });
     });
   }
 
@@ -286,6 +178,35 @@ export class CasoDetalleComponent implements OnInit {
     this.casosService.descargarEvidencia(evidencia.id).subscribe((blob) => {
       this.descargarBlob(blob, evidencia.nombreOriginal);
     });
+  }
+
+  etiquetaEstado(estado: string): string {
+    if (estado === 'DERIVADO_CARABINEROS') {
+      return 'Derivado Carabineros';
+    }
+
+    if (estado === 'DERIVADO_PDI') {
+      return 'Derivado PDI';
+    }
+
+    if (estado === 'CERRADO') {
+      return 'Cerrado';
+    }
+
+    return 'Pendiente';
+  }
+
+  private extraerObservacionesBase(observaciones: string | null | undefined): string {
+    if (!observaciones) {
+      return '';
+    }
+
+    const markerIndex = observaciones.indexOf(this.marcadorConformidad);
+    if (markerIndex < 0) {
+      return observaciones.trim();
+    }
+
+    return observaciones.slice(0, markerIndex).trim();
   }
 
   private descargarBlob(blob: Blob, nombre: string): void {
