@@ -2,19 +2,22 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
-  IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TipoControl } from '@prisma/client';
 import { PersonaCasoDto } from './persona-caso.dto';
+import {
+  TIPOS_CONTROL_PERMITIDOS,
+  TipoControlPermitido,
+} from '../../../common/constants/tipo-control.const';
 
 export class CreateCasoDto {
-  @IsEnum(TipoControl)
-  tipoControl: TipoControl;
+  @IsIn(TIPOS_CONTROL_PERMITIDOS)
+  tipoControl: TipoControlPermitido;
 
   @IsDateString()
   fechaHoraProcedimiento: string;

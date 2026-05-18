@@ -1,14 +1,19 @@
-import { EstadoCaso, TipoControl } from '@prisma/client';
+import { EstadoCaso } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator';
+import {
+  TIPOS_CONTROL_PERMITIDOS,
+  TipoControlPermitido,
+} from '../../../common/constants/tipo-control.const';
 
 export class QueryCasosDto {
   @IsOptional()
@@ -36,8 +41,8 @@ export class QueryCasosDto {
   estado?: EstadoCaso;
 
   @IsOptional()
-  @IsEnum(TipoControl)
-  tipoControl?: TipoControl;
+  @IsIn(TIPOS_CONTROL_PERMITIDOS)
+  tipoControl?: TipoControlPermitido;
 
   @IsOptional()
   @IsString()

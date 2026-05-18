@@ -19,6 +19,8 @@ export class AuthService {
   private readonly apiUrl = environment.apiUrl;
   private readonly userSubject = new BehaviorSubject<UsuarioSesion | null>(null);
   private readonly tokenSubject = new BehaviorSubject<string | null>(null);
+  private readonly storage =
+    typeof window !== 'undefined' ? window.sessionStorage : null;
 
   readonly user$ = this.userSubject.asObservable();
 
@@ -27,8 +29,10 @@ export class AuthService {
   }
 
   initialize(): void {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const rawUser = localStorage.getItem(USER_KEY);
+    this.clearLegacyLocalAuth();
+
+    const token = this.getItem(TOKEN_KEY);
+    const rawUser = this.getItem(USER_KEY);
 
     if (token && rawUser) {
       try {
@@ -48,8 +52,8 @@ export class AuthService {
         tap((response) => {
           this.tokenSubject.next(response.accessToken);
           this.userSubject.next(response.user);
-          localStorage.setItem(TOKEN_KEY, response.accessToken);
-          localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+          this.setItem(TOKEN_KEY, response.accessToken);
+          this.setItem(USER_KEY, JSON.stringify(response.user));
         }),
         map((response) => response.user),
       );
@@ -66,7 +70,7 @@ export class AuthService {
     return this.http.get<UsuarioSesion>(`${this.apiUrl}/auth/me`).pipe(
       tap((user) => {
         this.userSubject.next(user);
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
+        this.setItem(USER_KEY, JSON.stringify(user));
       }),
       map((user) => user ?? null),
       catchError(() => {
@@ -112,9 +116,40 @@ export class AuthService {
   }
 
   private clearSession(): void {
+    this.removeItem(TOKEN_KEY);
+    this.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     this.tokenSubject.next(null);
     this.userSubject.next(null);
+  }
+
+  private clearLegacyLocalAuth(): void {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  }
+
+  private getItem(key: string): string | null {
+    if (!this.storage) {
+      return null;
+    }
+
+    return this.storage.getItem(key);
+  }
+
+  private setItem(key: string, value: string): void {
+    if (!this.storage) {
+      return;
+    }
+
+    this.storage.setItem(key, value);
+  }
+
+  private removeItem(key: string): void {
+    if (!this.storage) {
+      return;
+    }
+
+    this.storage.removeItem(key);
   }
 }

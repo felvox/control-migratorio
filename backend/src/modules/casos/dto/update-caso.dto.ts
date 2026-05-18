@@ -3,18 +3,23 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { EstadoCaso, InstitucionDerivacion, TipoControl } from '@prisma/client';
+import { EstadoCaso, InstitucionDerivacion } from '@prisma/client';
 import { PersonaCasoDto } from './persona-caso.dto';
+import {
+  TIPOS_CONTROL_PERMITIDOS,
+  TipoControlPermitido,
+} from '../../../common/constants/tipo-control.const';
 
 export class UpdateCasoDto {
   @IsOptional()
-  @IsEnum(TipoControl)
-  tipoControl?: TipoControl;
+  @IsIn(TIPOS_CONTROL_PERMITIDOS)
+  tipoControl?: TipoControlPermitido;
 
   @IsOptional()
   @IsDateString()

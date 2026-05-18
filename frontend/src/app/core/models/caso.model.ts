@@ -1,6 +1,6 @@
 import { Rol } from './auth.model';
 
-export type TipoControl = 'INGRESO' | 'EGRESO' | 'TERRITORIO';
+export type TipoControl = 'INGRESO' | 'EGRESO';
 export type TipoPersona = 'PRINCIPAL' | 'ACOMPANANTE' | 'MENOR';
 export type EstadoCaso =
   | 'PENDIENTE'

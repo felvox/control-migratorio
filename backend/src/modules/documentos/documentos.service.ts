@@ -4,11 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Role } from '@prisma/client';
+import { Role, TipoEvidencia } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthUser } from '../../common/interfaces/auth-user.interface';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import PDFDocument from 'pdfkit';
+import {
+  PDFDocument as PDFLibDocument,
+  StandardFonts,
+  rgb,
+} from 'pdf-lib';
 import { createWriteStream, createReadStream, promises as fs } from 'fs';
 import { join, resolve } from 'path';
 import { randomUUID } from 'crypto';
@@ -82,14 +87,14 @@ export class DocumentosService {
       const stream = createWriteStream(rutaAbsoluta);
       doc.pipe(stream);
 
-      const left = 46;
-      const top = 52;
+      const left = 36;
+      const top = 38;
       const contentWidth = doc.page.width - left * 2;
       const rightLimit = left + contentWidth;
       const lineColor = '#000000';
       const principal =
         caso.personas.find((p) => p.tipoPersona === 'PRINCIPAL') ?? caso.personas[0];
-      const menor = caso.personas.find((p) => p.tipoPersona === 'MENOR');
+      const menores = caso.personas.filter((p) => p.tipoPersona === 'MENOR');
       const observacionesLimpias = this.limpiarObservacionesParaActa(caso.observaciones);
       let cursorY = top;
 
@@ -98,7 +103,7 @@ export class DocumentosService {
           return;
         }
 
-        doc.addPage();
+        doc.addPage({ margin: 0, size: 'A4' });
         cursorY = top;
       };
 
@@ -189,11 +194,10 @@ export class DocumentosService {
       const tablaY = cursorY;
       const tablaHeight = 62;
       const checkColWidth = 24;
-      const labelColWidth = (contentWidth - checkColWidth * 3) / 3;
+      const labelColWidth = (contentWidth - checkColWidth * 2) / 2;
       const opcionesControl = [
         { key: 'INGRESO', label: 'INGRESANDO A\nTERRITORIO\nNACIONAL' },
         { key: 'EGRESO', label: 'EGRESANDO DE\nTERRITORIO NACIONAL' },
-        { key: 'TERRITORIO', label: 'EN TERRITORIO NACIONAL' },
       ];
 
       doc.rect(tablaX, tablaY, contentWidth, tablaHeight).lineWidth(0.9).strokeColor(lineColor).stroke();
@@ -292,35 +296,52 @@ export class DocumentosService {
       drawFieldLine(cursorY, 'Teléfono', valor(principal?.telefono));
       cursorY += 22;
 
-      if (caso.existenMenores && menor) {
-        doc.font('Times-Bold').fontSize(12).text('01 ANTECEDENTES MENOR:', left, cursorY);
-        cursorY += 15;
+      if (caso.existenMenores && menores.length > 0) {
+        menores.forEach((menor, menorIndex) => {
+          ensureSpace(92);
+          const numeracion = String(menorIndex + 1).padStart(2, '0');
+          doc
+            .font('Times-Bold')
+            .fontSize(12)
+            .text(`${numeracion} ANTECEDENTES:`, left, cursorY);
+          cursorY += 15;
 
-        drawFieldLine(cursorY, 'Nombre y apellidos', valor(`${menor.nombres} ${menor.apellidos}`));
-        cursorY += 16;
-        drawFieldLine(cursorY, 'F./Nacimiento', valor(this.formatearFecha(menor.fechaNacimiento)), {
-          lineEndX: left + 244,
+          drawFieldLine(
+            cursorY,
+            'Nombre y apellidos',
+            valor(`${menor.nombres} ${menor.apellidos}`),
+          );
+          cursorY += 16;
+          drawFieldLine(
+            cursorY,
+            'F./Nacimiento',
+            valor(this.formatearFecha(menor.fechaNacimiento)),
+            {
+              lineEndX: left + 278,
+            },
+          );
+          drawFieldLine(cursorY, 'Edad', valor(String(menor.edad)), {
+            labelX: left + 290,
+            colonX: left + 338,
+            lineStartX: left + 350,
+            lineEndX: rightLimit - 2,
+          });
+          cursorY += 16;
+          drawFieldLine(cursorY, 'Nacionalidad', valor(menor.nacionalidad), {
+            lineEndX: left + 327,
+          });
+          drawFieldLine(cursorY, 'Ciudad de origen', valor(menor.lugarNacimiento), {
+            labelX: left + 338,
+            colonX: left + 446,
+            lineStartX: left + 460,
+          });
+          cursorY += 16;
+          drawFieldLine(cursorY, 'Acta Nac. o céd. Id.', valor(menor.numeroDocumento));
+          cursorY += 18;
         });
-        drawFieldLine(cursorY, 'Edad', valor(String(menor.edad)), {
-          labelX: left + 256,
-          colonX: left + 308,
-          lineStartX: left + 320,
-          lineEndX: rightLimit - 2,
-        });
-        cursorY += 16;
-        drawFieldLine(cursorY, 'Nacionalidad', valor(menor.nacionalidad), {
-          lineEndX: left + 327,
-        });
-        drawFieldLine(cursorY, 'Ciudad de origen', valor(menor.lugarNacimiento), {
-          labelX: left + 338,
-          colonX: left + 446,
-          lineStartX: left + 460,
-        });
-        cursorY += 16;
-        drawFieldLine(cursorY, 'Acta Nac. o céd. Id.', valor(menor.numeroDocumento));
-        cursorY += 18;
       }
 
+      ensureSpace(142);
       doc.font('Times-Bold').fontSize(14).text('ANTECEDENTES MIGRATORIOS:', left, cursorY);
       cursorY += 16;
 
@@ -353,10 +374,11 @@ export class DocumentosService {
       drawCheckOption(cursorY, 'NO', !presentaLesiones, left + 268, 78);
       cursorY += 22;
 
+      ensureSpace(260);
       doc.font('Times-Bold').fontSize(14).text('OBSERVACIONES', left + 8, cursorY);
       cursorY += 18;
 
-      const obsBoxHeight = 42;
+      const obsBoxHeight = 38;
       doc.rect(left, cursorY, contentWidth, obsBoxHeight).lineWidth(0.9).strokeColor(lineColor).stroke();
       doc
         .font('Times-Roman')
@@ -367,7 +389,7 @@ export class DocumentosService {
         });
       cursorY += obsBoxHeight + 2;
 
-      const conformidadHeight = 78;
+      const conformidadHeight = 72;
       doc.rect(left, cursorY, contentWidth, conformidadHeight).lineWidth(0.9).strokeColor(lineColor).stroke();
       doc
         .font('Times-Roman')
@@ -392,7 +414,7 @@ export class DocumentosService {
         .text('CONSULTADO A PDI', left + 8, cursorY + 2, { width: 160 });
       cursorY += consultadoHeight + 6;
 
-      drawFieldLine(cursorY, 'Firma en conformidad', valor('', ''), {
+      drawFieldLine(cursorY, 'Firma en conformidad', '', {
         labelX: left + 8,
         lineStartX: left + 164,
       });
@@ -406,66 +428,305 @@ export class DocumentosService {
         labelX: left + 8,
         lineStartX: left + 164,
       });
-      cursorY += 22;
+      cursorY += 18;
+      ensureSpace(118);
 
-      const firmaBlockWidth = (contentWidth - 16) / 2;
+      const firmaBlockWidth = contentWidth / 2;
       const receptor = caso.existenMenores
         ? 'FUNCIONARIO QUE RECIBE/ENTREGA DE CARABINEROS'
         : 'FUNCIONARIO QUE RECIBE/ENTREGA DE PDI';
       const leftSignX = left;
-      const rightSignX = left + firmaBlockWidth + 16;
+      const rightSignX = left + firmaBlockWidth;
+      const firmaHeaderHeight = 24;
+      const firmaRowHeight = 19;
+      const firmaRows = ['Firma', 'Nombre', 'Grado', 'Unidad'];
+      const firmaTableHeight = firmaHeaderHeight + firmaRows.length * firmaRowHeight;
+      const colonOffset = 72;
+
+      doc
+        .rect(leftSignX, cursorY, contentWidth, firmaTableHeight)
+        .lineWidth(0.9)
+        .strokeColor(lineColor)
+        .stroke();
+      drawLine(rightSignX, cursorY, rightSignX, cursorY + firmaTableHeight);
+      drawLine(leftSignX, cursorY + firmaHeaderHeight, leftSignX + contentWidth, cursorY + firmaHeaderHeight);
+
+      for (let index = 1; index < firmaRows.length; index += 1) {
+        const y = cursorY + firmaHeaderHeight + firmaRowHeight * index;
+        drawLine(leftSignX, y, leftSignX + contentWidth, y);
+      }
 
       doc
         .font('Times-Bold')
-        .fontSize(10.5)
-        .text('FUNCIONARIO DE EJÉRCITO QUE ENTREGA', leftSignX + 6, cursorY, {
-          width: firmaBlockWidth - 12,
+        .fontSize(10.6)
+        .text('FUNCIONARIO DE EJÉRCITO QUE ENTREGA', leftSignX + 4, cursorY + 4, {
+          width: firmaBlockWidth - 8,
+          align: 'center',
+        })
+        .text(receptor, rightSignX + 4, cursorY + 4, {
+          width: firmaBlockWidth - 8,
           align: 'center',
         });
-      doc
-        .font('Times-Bold')
-        .fontSize(10.5)
-        .text(receptor, rightSignX + 6, cursorY, {
-          width: firmaBlockWidth - 12,
-          align: 'center',
-        });
-      cursorY += 14;
 
-      const drawFirmaSet = (baseX: number, nombreFunc: string) => {
-        drawFieldLine(cursorY, 'Firma', '', {
-          labelX: baseX + 8,
-          colonX: baseX + 54,
-          lineStartX: baseX + 66,
-          lineEndX: baseX + firmaBlockWidth - 6,
-        });
-        drawFieldLine(cursorY + 15, 'Nombre', valor(nombreFunc), {
-          labelX: baseX + 8,
-          colonX: baseX + 54,
-          lineStartX: baseX + 66,
-          lineEndX: baseX + firmaBlockWidth - 6,
-        });
-        drawFieldLine(cursorY + 30, 'Grado', '', {
-          labelX: baseX + 8,
-          colonX: baseX + 54,
-          lineStartX: baseX + 66,
-          lineEndX: baseX + firmaBlockWidth - 6,
-        });
-        drawFieldLine(cursorY + 45, 'Unidad', '', {
-          labelX: baseX + 8,
-          colonX: baseX + 54,
-          lineStartX: baseX + 66,
-          lineEndX: baseX + firmaBlockWidth - 6,
-        });
+      const drawFirmaRow = (columnX: number, rowIndex: number, valueText = '') => {
+        const rowY = cursorY + firmaHeaderHeight + rowIndex * firmaRowHeight + 3;
+        const label = firmaRows[rowIndex];
+        const lineStartX = columnX + colonOffset + 14;
+        const lineEndX = columnX + firmaBlockWidth - 8;
+
+        doc.font('Times-Roman').fontSize(11).text(label, columnX + 8, rowY);
+        doc.font('Times-Roman').fontSize(11).text(':', columnX + colonOffset, rowY);
+        drawLine(lineStartX, rowY + 13, lineEndX, rowY + 13);
+        if (valueText) {
+          doc.font('Times-Roman').fontSize(10.7).text(valueText, lineStartX + 2, rowY, {
+            width: lineEndX - lineStartX - 4,
+            lineBreak: false,
+          });
+        }
       };
 
-      drawFirmaSet(leftSignX, caso.creadoPor.nombreCompleto);
-      drawFirmaSet(rightSignX, '');
+      firmaRows.forEach((_, rowIndex) => {
+        drawFirmaRow(leftSignX, rowIndex, rowIndex === 1 ? caso.creadoPor.nombreCompleto : '');
+        drawFirmaRow(rightSignX, rowIndex);
+      });
 
       doc.end();
 
       stream.on('finish', () => resolvePromise());
       stream.on('error', (error) => rejectPromise(error));
     });
+
+    await this.anexarEvidenciasAlPdf(rutaAbsoluta, caso.evidencias);
+  }
+
+  private ordenarEvidenciasParaAnexo(
+    evidencias: Awaited<
+      ReturnType<DocumentosService['obtenerCasoConAcceso']>
+    >['evidencias'],
+  ) {
+    const prioridadTipo: Record<TipoEvidencia, number> = {
+      [TipoEvidencia.DOCUMENTO_IDENTIDAD]: 0,
+      [TipoEvidencia.FOTO_PERSONA]: 1,
+      [TipoEvidencia.ADJUNTO_GENERAL]: 2,
+    };
+
+    return [...evidencias].sort((a, b) => {
+      const prioridadA = prioridadTipo[a.tipoEvidencia] ?? 99;
+      const prioridadB = prioridadTipo[b.tipoEvidencia] ?? 99;
+
+      if (prioridadA !== prioridadB) {
+        return prioridadA - prioridadB;
+      }
+
+      return a.creadoAt.getTime() - b.creadoAt.getTime();
+    });
+  }
+
+  private tituloTipoEvidencia(tipo: TipoEvidencia) {
+    if (tipo === TipoEvidencia.DOCUMENTO_IDENTIDAD) {
+      return 'Documento de identidad';
+    }
+
+    if (tipo === TipoEvidencia.FOTO_PERSONA) {
+      return 'Fotografía de persona';
+    }
+
+    return 'Adjunto general';
+  }
+
+  private async anexarEvidenciasAlPdf(
+    rutaAbsoluta: string,
+    evidencias: Awaited<
+      ReturnType<DocumentosService['obtenerCasoConAcceso']>
+    >['evidencias'],
+  ) {
+    if (!evidencias.length) {
+      return;
+    }
+
+    const evidenciasOrdenadas = this.ordenarEvidenciasParaAnexo(evidencias);
+    const basePdfBytes = await fs.readFile(rutaAbsoluta);
+    const pdfFinal = await PDFLibDocument.load(basePdfBytes);
+    const fontTitulo = await pdfFinal.embedFont(StandardFonts.HelveticaBold);
+    const fontTexto = await pdfFinal.embedFont(StandardFonts.Helvetica);
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
+    const margin = 38;
+    const tituloY = pageHeight - 42;
+    const areaSuperiorY = pageHeight - 88;
+    const areaInferiorY = 42;
+    const slotsPorPagina = 3;
+    const separacionSlots = 14;
+    const slotWidth = pageWidth - margin * 2;
+    const slotHeight =
+      (areaSuperiorY - areaInferiorY - separacionSlots * (slotsPorPagina - 1)) /
+      slotsPorPagina;
+    const slotPadding = 12;
+    const altoEtiqueta = 22;
+    const areaImagenBorde = rgb(0.82, 0.86, 0.9);
+    const areaSlotBorde = rgb(0.75, 0.8, 0.86);
+
+    let paginaActual: ReturnType<typeof pdfFinal.addPage> | null = null;
+    let slotActual = 0;
+
+    const crearPaginaAnexo = () => {
+      const pagina = pdfFinal.addPage([pageWidth, pageHeight]);
+      pagina.drawText('ANEXO DE EVIDENCIAS', {
+        x: margin,
+        y: tituloY,
+        size: 14,
+        font: fontTitulo,
+        color: rgb(0.1, 0.12, 0.16),
+      });
+      return pagina;
+    };
+
+    const tomarSiguienteSlot = () => {
+      if (!paginaActual || slotActual >= slotsPorPagina) {
+        paginaActual = crearPaginaAnexo();
+        slotActual = 0;
+      }
+
+      const slotY =
+        areaSuperiorY -
+        slotHeight -
+        slotActual * (slotHeight + separacionSlots);
+      slotActual += 1;
+
+      return { pagina: paginaActual, slotY };
+    };
+
+    const dibujarMarcoSlot = (pagina: ReturnType<typeof pdfFinal.addPage>, slotY: number, etiqueta: string) => {
+      const slotX = margin;
+      pagina.drawRectangle({
+        x: slotX,
+        y: slotY,
+        width: slotWidth,
+        height: slotHeight,
+        borderColor: areaSlotBorde,
+        borderWidth: 1,
+      });
+
+      pagina.drawText(etiqueta, {
+        x: slotX + slotPadding,
+        y: slotY + slotHeight - slotPadding - 10,
+        size: 10,
+        font: fontTexto,
+        color: rgb(0.32, 0.38, 0.45),
+      });
+
+      const frameX = slotX + slotPadding;
+      const frameY = slotY + slotPadding;
+      const frameWidth = slotWidth - slotPadding * 2;
+      const frameHeight = slotHeight - slotPadding * 2 - altoEtiqueta;
+
+      pagina.drawRectangle({
+        x: frameX,
+        y: frameY,
+        width: frameWidth,
+        height: frameHeight,
+        borderColor: areaImagenBorde,
+        borderWidth: 1,
+      });
+
+      return { frameX, frameY, frameWidth, frameHeight };
+    };
+
+    for (let index = 0; index < evidenciasOrdenadas.length; index += 1) {
+      const evidencia = evidenciasOrdenadas[index];
+      const rutaEvidencia = join(this.storageRoot, evidencia.rutaArchivo);
+
+      try {
+        await fs.access(rutaEvidencia);
+      } catch (_error) {
+        continue;
+      }
+
+      const contenidoBytes = await fs.readFile(rutaEvidencia);
+      const mime = evidencia.mimeType.toLowerCase();
+
+      if (mime === 'application/pdf') {
+        const pdfAdjunto = await PDFLibDocument.load(contenidoBytes);
+        const totalPaginas = pdfAdjunto.getPageCount();
+
+        for (let paginaAdjuntaIndex = 0; paginaAdjuntaIndex < totalPaginas; paginaAdjuntaIndex += 1) {
+          const [paginaAdjunta] = await pdfFinal.embedPdf(contenidoBytes, [paginaAdjuntaIndex]);
+          const { pagina, slotY } = tomarSiguienteSlot();
+          const subtitulo = totalPaginas > 1
+            ? `${index + 1}. ${this.tituloTipoEvidencia(evidencia.tipoEvidencia)} - ${evidencia.nombreOriginal} (${paginaAdjuntaIndex + 1}/${totalPaginas})`
+            : `${index + 1}. ${this.tituloTipoEvidencia(evidencia.tipoEvidencia)} - ${evidencia.nombreOriginal}`;
+
+          const { frameX, frameY, frameWidth, frameHeight } = dibujarMarcoSlot(
+            pagina,
+            slotY,
+            subtitulo,
+          );
+          const maxWidth = frameWidth - 10;
+          const maxHeight = frameHeight - 10;
+          const escala = Math.min(
+            maxWidth / paginaAdjunta.width,
+            maxHeight / paginaAdjunta.height,
+          );
+          const targetWidth = paginaAdjunta.width * escala;
+          const targetHeight = paginaAdjunta.height * escala;
+          const x = frameX + (frameWidth - targetWidth) / 2;
+          const y = frameY + (frameHeight - targetHeight) / 2;
+
+          pagina.drawPage(paginaAdjunta, {
+            x,
+            y,
+            width: targetWidth,
+            height: targetHeight,
+          });
+        }
+
+        continue;
+      }
+
+      const { pagina, slotY } = tomarSiguienteSlot();
+      const etiqueta = `${index + 1}. ${this.tituloTipoEvidencia(
+        evidencia.tipoEvidencia,
+      )} - ${evidencia.nombreOriginal}`;
+      const { frameX, frameY, frameWidth, frameHeight } = dibujarMarcoSlot(
+        pagina,
+        slotY,
+        etiqueta,
+      );
+
+      if (mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/jpg') {
+        const imagen =
+          mime === 'image/png'
+            ? await pdfFinal.embedPng(contenidoBytes)
+            : await pdfFinal.embedJpg(contenidoBytes);
+
+        const maxWidth = frameWidth - 10;
+        const maxHeight = frameHeight - 10;
+        const escala = Math.min(maxWidth / imagen.width, maxHeight / imagen.height);
+        const targetWidth = imagen.width * escala;
+        const targetHeight = imagen.height * escala;
+        const x = frameX + (frameWidth - targetWidth) / 2;
+        const y = frameY + (frameHeight - targetHeight) / 2;
+
+        pagina.drawImage(imagen, {
+          x,
+          y,
+          width: targetWidth,
+          height: targetHeight,
+        });
+        continue;
+      }
+
+      pagina.drawText('Formato no soportado para previsualización en anexo.', {
+        x: frameX + 12,
+        y: frameY + frameHeight / 2,
+        size: 11,
+        font: fontTexto,
+        color: rgb(0.5, 0.1, 0.1),
+      });
+    }
+
+    const pdfBytesFinales = await pdfFinal.save();
+    await fs.writeFile(rutaAbsoluta, pdfBytesFinales);
   }
 
   private etiquetaTipoControl(tipo: string): string {
@@ -477,7 +738,7 @@ export class DocumentosService {
       return 'Egresando de territorio nacional';
     }
 
-    return 'En territorio nacional';
+    return 'No informado';
   }
 
   private etiquetaEstado(estado: string): string {

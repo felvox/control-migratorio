@@ -319,7 +319,6 @@ export class LoginComponent {
       next: () => {
         this.guardarCredencialesRecordadas(
           raw.run || '',
-          raw.password || '',
           Boolean(raw.recordar),
         );
 
@@ -365,6 +364,17 @@ export class LoginComponent {
           return;
         }
 
+        if (
+          error.status === 401 &&
+          typeof error.error?.message === 'string' &&
+          error.error.message.includes('sesión activa de administrador')
+        ) {
+          this.abrirModalError(
+            'Acceso restringido: el administrador ya tiene una sesión activa.',
+          );
+          return;
+        }
+
         this.abrirModalError('Usuario o clave inválidos');
       },
     });
@@ -396,16 +406,15 @@ export class LoginComponent {
 
   private cargarCredencialesRecordadas(): void {
     const run = localStorage.getItem(LOGIN_RUN_KEY);
-    const password = localStorage.getItem(LOGIN_PASSWORD_KEY);
+    localStorage.removeItem(LOGIN_PASSWORD_KEY);
 
-    if (!run || !password) {
+    if (!run) {
       return;
     }
 
     this.form.patchValue(
       {
         run: formatRunForInput(run),
-        password,
         recordar: true,
       },
       { emitEvent: false },
@@ -414,7 +423,6 @@ export class LoginComponent {
 
   private guardarCredencialesRecordadas(
     run: string,
-    password: string,
     recordar: boolean,
   ): void {
     if (!recordar) {
@@ -424,6 +432,6 @@ export class LoginComponent {
     }
 
     localStorage.setItem(LOGIN_RUN_KEY, run);
-    localStorage.setItem(LOGIN_PASSWORD_KEY, password);
+    localStorage.removeItem(LOGIN_PASSWORD_KEY);
   }
 }

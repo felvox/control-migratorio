@@ -201,11 +201,28 @@ interface PasoFormulario {
           </section>
 
           <section class="sheet-section" *ngIf="pasoActual === 'antecedentes_menor'" formArrayName="personas">
-            <h4>3. 01 ANTECEDENTES</h4>
+            <div class="section-header">
+              <h4>3. ANTECEDENTES DE MENOR</h4>
+              <button type="button" class="btn-secondary btn-sm" (click)="agregarMenor()">
+                Agregar menor
+              </button>
+            </div>
 
-            <article class="persona-card persona-card-menor" [formGroupName]="indicePersonaMenor">
+            <article
+              class="persona-card persona-card-menor"
+              *ngFor="let indiceMenor of indicesPersonasMenores; let orden = index"
+              [formGroupName]="indiceMenor"
+            >
               <div class="persona-header">
-                <strong>ANTECEDENTES DE MENOR</strong>
+                <strong>ANTECEDENTES DE MENOR {{ orden + 1 }}</strong>
+                <button
+                  type="button"
+                  class="btn-danger btn-sm"
+                  *ngIf="puedeEliminarMenor"
+                  (click)="eliminarMenor(indiceMenor)"
+                >
+                  Quitar
+                </button>
               </div>
 
               <div class="form-grid persona-form-grid">
@@ -224,7 +241,7 @@ interface PasoFormulario {
                   <input
                     type="date"
                     formControlName="fechaNacimiento"
-                    (change)="actualizarEdad(indicePersonaMenor)"
+                    (change)="actualizarEdad(indiceMenor)"
                   />
                 </div>
 
@@ -1410,11 +1427,18 @@ export class CasoFormComponent implements OnInit {
     return index >= 0 ? index : 0;
   }
 
-  get indicePersonaMenor(): number {
-    const index = this.personas.controls.findIndex(
-      (control) => (control.get('tipoPersona')?.value as TipoPersona) === 'MENOR',
-    );
-    return index >= 0 ? index : 1;
+  get indicesPersonasMenores(): number[] {
+    return this.personas.controls
+      .map((control, index) => ({
+        index,
+        tipo: control.get('tipoPersona')?.value as TipoPersona,
+      }))
+      .filter((item) => item.tipo === 'MENOR')
+      .map((item) => item.index);
+  }
+
+  get puedeEliminarMenor(): boolean {
+    return this.indicesPersonasMenores.length > 1;
   }
 
   ngOnInit(): void {
@@ -1527,6 +1551,31 @@ export class CasoFormComponent implements OnInit {
     }
 
     persona.patchValue({ edad: Math.max(edad, 0) });
+  }
+
+  agregarMenor(): void {
+    if (!this.esActaConMenor) {
+      return;
+    }
+
+    this.personas.push(this.crearPersonaForm('MENOR'));
+    this.form.patchValue({
+      vieneAcompanado: true,
+      existenMenores: true,
+    });
+  }
+
+  eliminarMenor(index: number): void {
+    if (!this.esActaConMenor) {
+      return;
+    }
+
+    const indicesMenores = this.indicesPersonasMenores;
+    if (indicesMenores.length <= 1) {
+      return;
+    }
+
+    this.personas.removeAt(index);
   }
 
   abrirModalObservaciones(): void {
@@ -1744,6 +1793,9 @@ export class CasoFormComponent implements OnInit {
     }
 
     const totalMenores = personas.filter((persona) => persona.tipoPersona === 'MENOR').length;
+    const totalNoPermitidosConMenor = personas.filter(
+      (persona) => persona.tipoPersona !== 'PRINCIPAL' && persona.tipoPersona !== 'MENOR',
+    ).length;
 
     if (this.esActaMayor) {
       if (personas.length !== 1 || totalMenores > 0) {
@@ -1754,9 +1806,21 @@ export class CasoFormComponent implements OnInit {
     }
 
     if (this.esActaConMenor) {
-      if (personas.length !== 2 || totalMenores !== 1) {
+      if (totalMenores < 1 || personas.length < 2) {
         this.errorGeneral =
-          'El formato con menor de edad requiere 1 persona principal y 1 menor.';
+          'El formato con menor de edad requiere 1 persona principal y al menos 1 menor.';
+        return false;
+      }
+
+      if (totalNoPermitidosConMenor > 0) {
+        this.errorGeneral =
+          'En este formato solo se permiten 1 persona principal y menores de edad.';
+        return false;
+      }
+
+      if (personas.length !== totalMenores + 1) {
+        this.errorGeneral =
+          'La composición del caso con menor debe ser 1 persona principal y uno o más menores.';
         return false;
       }
     }
@@ -1796,13 +1860,14 @@ export class CasoFormComponent implements OnInit {
         return true;
       }
 
-      const validoMenores = this.validarPersonasPorIndices([this.indicePersonaMenor]);
+      const indicesMenores = this.indicesPersonasMenores;
+      const validoMenores = this.validarPersonasPorIndices(indicesMenores);
       if (!validoMenores) {
         this.errorGeneral = 'Completa los campos obligatorios de antecedentes de menor.';
         return false;
       }
 
-      return true;
+      return this.validarComposicionGrupo();
     }
 
     if (paso === 'evidencias') {
@@ -2090,10 +2155,20 @@ export class CasoFormComponent implements OnInit {
       personasActuales.find((persona) => persona.tipoPersona === 'PRINCIPAL') ??
       personasActuales[0] ??
       null;
-    const menorActual =
-      personasActuales.find((persona) => persona.tipoPersona === 'MENOR') ??
-      personasActuales.find((persona) => persona.tipoPersona !== 'PRINCIPAL') ??
-      null;
+    const menoresActuales = personasActuales.filter(
+      (persona) => persona.tipoPersona === 'MENOR',
+    );
+    const otrosNoPrincipales = personasActuales.filter(
+      (persona) =>
+        persona.tipoPersona !== 'PRINCIPAL' && persona.tipoPersona !== 'MENOR',
+    );
+    const menoresRecuperados =
+      menoresActuales.length > 0
+        ? menoresActuales
+        : otrosNoPrincipales.map((persona) => ({
+            ...persona,
+            tipoPersona: 'MENOR' as TipoPersona,
+          }));
 
     const principalForm = this.crearPersonaForm('PRINCIPAL');
     if (principalActual) {
@@ -2104,14 +2179,16 @@ export class CasoFormComponent implements OnInit {
     this.personas.push(principalForm);
 
     if (tipoActa === 'CON_MENOR') {
-      const menorForm = this.crearPersonaForm('MENOR');
-      if (menorActual) {
-        menorForm.patchValue({ ...menorActual, tipoPersona: 'MENOR' });
-      } else {
-        menorForm.patchValue({ tipoPersona: 'MENOR' });
+      if (menoresRecuperados.length === 0) {
+        this.personas.push(this.crearPersonaForm('MENOR'));
+        return;
       }
 
-      this.personas.push(menorForm);
+      menoresRecuperados.forEach((menorActual) => {
+        const menorForm = this.crearPersonaForm('MENOR');
+        menorForm.patchValue({ ...menorActual, tipoPersona: 'MENOR' });
+        this.personas.push(menorForm);
+      });
     }
   }
 

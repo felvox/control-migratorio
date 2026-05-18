@@ -74,6 +74,18 @@ export class ReportesService {
     });
   }
 
+  private etiquetaTipoControl(tipo: string): string {
+    if (tipo === 'INGRESO') {
+      return 'INGRESO';
+    }
+
+    if (tipo === 'EGRESO') {
+      return 'EGRESO';
+    }
+
+    return 'NO INFORMADO';
+  }
+
   async exportarExcel(
     query: QueryReporteCasosDto,
     user: AuthUser,
@@ -103,7 +115,7 @@ export class ReportesService {
       sheet.addRow({
         codigo: caso.codigo,
         fecha: new Date(caso.fechaHoraProcedimiento).toLocaleString('es-CL'),
-        tipoControl: caso.tipoControl,
+        tipoControl: this.etiquetaTipoControl(caso.tipoControl),
         estado: caso.estado,
         institucion: caso.institucionDerivacion,
         lugar: caso.lugar,
@@ -161,7 +173,7 @@ export class ReportesService {
 
         doc.fontSize(10).text(`${index + 1}. ${caso.codigo} - ${caso.estado}`);
         doc.fontSize(9).text(
-          `${new Date(caso.fechaHoraProcedimiento).toLocaleString('es-CL')} | ${caso.tipoControl} | ${caso.lugar}`,
+          `${new Date(caso.fechaHoraProcedimiento).toLocaleString('es-CL')} | ${this.etiquetaTipoControl(caso.tipoControl)} | ${caso.lugar}`,
         );
         doc.text(
           `Principal: ${principal ? `${principal.nombres} ${principal.apellidos}` : 'No registra'} | Documento: ${principal?.numeroDocumento ?? 'No registra'} | Nacionalidad: ${principal?.nacionalidad ?? 'No registra'}`,

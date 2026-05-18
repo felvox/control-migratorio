@@ -63,7 +63,7 @@ import { AuthService } from '../../core/services/auth.service';
             <tr *ngFor="let caso of casos">
               <td>{{ caso.codigo }}</td>
               <td>{{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}</td>
-              <td>{{ caso.tipoControl }}</td>
+              <td>{{ etiquetaTipoControl(caso.tipoControl) }}</td>
               <td>{{ caso.lugar }}</td>
               <td><span class="badge">{{ caso.estado }}</span></td>
               <td>
@@ -149,5 +149,17 @@ export class CasosListComponent implements OnInit {
 
   obtenerPrincipal(caso: Caso) {
     return caso.personas[0] ?? { nombres: '-', apellidos: '-' };
+  }
+
+  etiquetaTipoControl(tipoControl: string): string {
+    if (tipoControl === 'INGRESO') {
+      return 'Ingresando';
+    }
+
+    if (tipoControl === 'EGRESO') {
+      return 'Egresando';
+    }
+
+    return 'No informado';
   }
 }

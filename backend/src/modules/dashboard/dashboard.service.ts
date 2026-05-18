@@ -408,9 +408,7 @@ export class DashboardService {
       }),
     );
 
-    const porTipoControl = (
-      [TipoControl.INGRESO, TipoControl.EGRESO, TipoControl.TERRITORIO] as const
-    ).map((tipo) => ({
+    const porTipoControl = ([TipoControl.INGRESO, TipoControl.EGRESO] as const).map((tipo) => ({
       tipo,
       total:
         casosPorTipoControl.find((item) => item.tipoControl === tipo)?._count

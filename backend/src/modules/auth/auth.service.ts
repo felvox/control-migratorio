@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { comparePassword } from '../../common/utils/password.util';
@@ -10,6 +11,8 @@ interface LoginMetadata {
   ip?: string;
   userAgent?: string;
 }
+
+const ADMIN_SESSION_ACTIVITY_WINDOW_MINUTES = 30;
 
 @Injectable()
 export class AuthService {
@@ -42,6 +45,46 @@ export class AuthService {
     if (!passwordValida) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
+
+    const limiteSesionActiva = new Date(
+      Date.now() - ADMIN_SESSION_ACTIVITY_WINDOW_MINUTES * 60 * 1000,
+    );
+
+    const sesionAdminActiva = await this.prisma.sesionAcceso.findFirst({
+      where: {
+        cierreSesion: null,
+        inicioSesion: {
+          gte: limiteSesionActiva,
+        },
+        usuarioId: {
+          not: usuario.id,
+        },
+        usuario: {
+          rol: Role.ADMINISTRADOR,
+          activo: true,
+          eliminadoAt: null,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (sesionAdminActiva) {
+      throw new UnauthorizedException(
+        'Acceso restringido: existe una sesión activa de administrador',
+      );
+    }
+
+    await this.prisma.sesionAcceso.updateMany({
+      where: {
+        usuarioId: usuario.id,
+        cierreSesion: null,
+      },
+      data: {
+        cierreSesion: new Date(),
+      },
+    });
 
     const sesionId = await this.auditoriaService.registrarInicioSesion({
       usuarioId: usuario.id,

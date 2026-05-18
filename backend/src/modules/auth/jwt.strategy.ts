@@ -12,6 +12,8 @@ interface JwtPayload {
   sesionId?: string;
 }
 
+const SESSION_ACTIVITY_WINDOW_MINUTES = 30;
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -26,6 +28,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    if (!payload.sesionId) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
     const user = await this.prisma.usuario.findFirst({
       where: {
         id: payload.sub,
@@ -43,6 +49,37 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException('Token inválido');
     }
+
+    const limiteSesionActiva = new Date(
+      Date.now() - SESSION_ACTIVITY_WINDOW_MINUTES * 60 * 1000,
+    );
+
+    const sesionActiva = await this.prisma.sesionAcceso.findFirst({
+      where: {
+        id: payload.sesionId,
+        usuarioId: user.id,
+        cierreSesion: null,
+        inicioSesion: {
+          gte: limiteSesionActiva,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!sesionActiva) {
+      throw new UnauthorizedException('Sesión expirada');
+    }
+
+    await this.prisma.sesionAcceso.update({
+      where: {
+        id: payload.sesionId,
+      },
+      data: {
+        inicioSesion: new Date(),
+      },
+    });
 
     return {
       id: user.id,

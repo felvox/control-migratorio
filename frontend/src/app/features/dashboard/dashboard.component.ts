@@ -4,7 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { DashboardService } from './dashboard.service';
 
-type TipoControlDashboard = 'INGRESO' | 'EGRESO' | 'TERRITORIO';
+type TipoControlDashboard = 'INGRESO' | 'EGRESO';
 type EstadoDashboard =
   | 'PENDIENTE'
   | 'DERIVADO_CARABINEROS'
@@ -308,7 +308,6 @@ interface BarraNacionalidad {
                     class="badge"
                     [class.badge-blue]="fila.tipoControl === 'INGRESO'"
                     [class.badge-green]="fila.tipoControl === 'EGRESO'"
-                    [class.badge-orange]="fila.tipoControl === 'TERRITORIO'"
                   >
                     {{ etiquetaTipo(fila.tipoControl) }}
                   </span>
@@ -880,7 +879,7 @@ export class DashboardComponent implements OnInit {
     if (tipo === 'EGRESO') {
       return 'Egresando';
     }
-    return 'En territorio nacional';
+    return 'No informado';
   }
 
   etiquetaEstado(estado: EstadoDashboard): string {
@@ -913,7 +912,7 @@ export class DashboardComponent implements OnInit {
     if (tipo === 'EGRESO') {
       return '#22c55e';
     }
-    return '#f59e0b';
+    return '#94a3b8';
   }
 
   colorNacionalidad(index: number): string {

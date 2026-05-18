@@ -39,7 +39,7 @@ import { AuthService } from '../../core/services/auth.service';
         </p>
         <p><strong>Estado:</strong> {{ etiquetaEstado(caso.estado) }}</p>
         <p>
-          <strong>Tipo de control:</strong> {{ caso.tipoControl }} | <strong>Fecha:</strong>
+          <strong>Tipo de control:</strong> {{ etiquetaTipoControl(caso.tipoControl) }} | <strong>Fecha:</strong>
           {{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}
         </p>
         <p><strong>Lugar:</strong> {{ caso.lugar }}</p>
@@ -194,6 +194,18 @@ export class CasoDetalleComponent implements OnInit {
     }
 
     return 'Pendiente';
+  }
+
+  etiquetaTipoControl(tipoControl: string): string {
+    if (tipoControl === 'INGRESO') {
+      return 'Ingresando';
+    }
+
+    if (tipoControl === 'EGRESO') {
+      return 'Egresando';
+    }
+
+    return 'No informado';
   }
 
   private extraerObservacionesBase(observaciones: string | null | undefined): string {
