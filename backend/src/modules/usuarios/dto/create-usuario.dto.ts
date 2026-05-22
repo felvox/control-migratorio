@@ -1,8 +1,9 @@
-import { Role } from '@prisma/client';
+import { Jaf, Role } from '@prisma/client';
 import {
   IsEnum,
   IsNotEmpty,
   Matches,
+  IsOptional,
   IsString,
 } from 'class-validator';
 
@@ -28,6 +29,10 @@ export class CreateUsuarioDto {
 
   @IsEnum(Role)
   rol: Role;
+
+  @IsOptional()
+  @IsEnum(Jaf)
+  jaf?: Jaf;
 
   @IsString()
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/, {

@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   FormArray,
   FormBuilder,
@@ -16,6 +17,7 @@ import {
   TipoPersona,
   TipoEvidencia,
 } from '../../core/models/caso.model';
+import { Jaf } from '../../core/models/auth.model';
 import { CasosService } from './casos.service';
 import { AlertModalComponent } from '../../shared/components/alert-modal.component';
 
@@ -117,7 +119,7 @@ interface PasoFormulario {
               </div>
 
               <div>
-                <label>Coordenadas</label>
+                <label>Coordenadas (opcional)</label>
                 <input formControlName="coordenadas" placeholder="Ej: -18.4783,-70.3126" />
               </div>
             </div>
@@ -134,7 +136,7 @@ interface PasoFormulario {
 
               <div class="form-grid persona-form-grid">
                 <div>
-                  <label>Nombres y apellidos</label>
+                  <label>Nombres</label>
                   <input formControlName="nombres" />
                 </div>
 
@@ -145,7 +147,12 @@ interface PasoFormulario {
 
                 <div>
                   <label>Nacionalidad</label>
-                  <input formControlName="nacionalidad" />
+                  <select formControlName="nacionalidad">
+                    <option value="">Seleccionar nacionalidad</option>
+                    <option *ngFor="let nacionalidad of nacionalidadesFrecuentes" [value]="nacionalidad">
+                      {{ nacionalidad }}
+                    </option>
+                  </select>
                 </div>
 
                 <div>
@@ -179,7 +186,12 @@ interface PasoFormulario {
 
                 <div>
                   <label>Estado civil</label>
-                  <input formControlName="estadoCivil" />
+                  <select formControlName="estadoCivil">
+                    <option value="">Seleccionar estado civil</option>
+                    <option *ngFor="let estado of estadosCiviles" [value]="estado">
+                      {{ estado }}
+                    </option>
+                  </select>
                 </div>
 
                 <div>
@@ -227,7 +239,7 @@ interface PasoFormulario {
 
               <div class="form-grid persona-form-grid">
                 <div>
-                  <label>Nombre y apellidos</label>
+                  <label>Nombres</label>
                   <input formControlName="nombres" />
                 </div>
 
@@ -241,13 +253,20 @@ interface PasoFormulario {
                   <input
                     type="date"
                     formControlName="fechaNacimiento"
+                    [min]="fechaNacimientoMinMenorIso"
+                    [max]="fechaNacimientoMaxMenorIso"
                     (change)="actualizarEdad(indiceMenor)"
                   />
                 </div>
 
                 <div>
                   <label>Nacionalidad</label>
-                  <input formControlName="nacionalidad" />
+                  <select formControlName="nacionalidad">
+                    <option value="">Seleccionar nacionalidad</option>
+                    <option *ngFor="let nacionalidad of nacionalidadesFrecuentes" [value]="nacionalidad">
+                      {{ nacionalidad }}
+                    </option>
+                  </select>
                 </div>
 
                 <div>
@@ -262,7 +281,7 @@ interface PasoFormulario {
 
                 <div>
                   <label>Edad</label>
-                  <input type="number" formControlName="edad" />
+                  <input type="number" formControlName="edad" min="0" max="18" readonly />
                 </div>
               </div>
             </article>
@@ -379,9 +398,14 @@ interface PasoFormulario {
                   </div>
 
                   <div>
-                    <label>Persona asociada (opcional)</label>
+                    <label>
+                      Persona asociada
+                      {{ tipoEvidenciaRequierePersona(evidenciaFormAt(i).get('tipoEvidencia')?.value) ? '(obligatoria)' : '(opcional)' }}
+                    </label>
                     <select formControlName="personaRef">
-                      <option value="">Sin persona</option>
+                      <option value="" *ngIf="!tipoEvidenciaRequierePersona(evidenciaFormAt(i).get('tipoEvidencia')?.value)">
+                        Sin persona
+                      </option>
                       <option *ngFor="let index of indicesTodasLasPersonas" [value]="index">
                         {{ personaEtiqueta(index) }}
                       </option>
@@ -397,9 +421,21 @@ interface PasoFormulario {
                 <p class="hint-text" *ngIf="evidenciaFormAt(i).get('archivoNombre')?.value">
                   Archivo: {{ evidenciaFormAt(i).get('archivoNombre')?.value }}
                 </p>
-                <p class="error-text" *ngIf="evidenciaFormAt(i).get('archivoError')?.value as archivoError">
-                  {{ archivoError }}
-                </p>
+
+                <div class="evidencia-preview" *ngIf="evidenciaFormAt(i).get('previewUrl')?.value as previewUrl">
+                  <img
+                    *ngIf="evidenciaFormAt(i).get('previewEsImagen')?.value"
+                    [src]="previewUrl"
+                    alt="Vista previa evidencia"
+                  />
+
+                  <div class="pdf-preview" *ngIf="evidenciaFormAt(i).get('previewEsPdf')?.value">
+                    <span>PDF seleccionado</span>
+                    <button type="button" class="btn-secondary btn-sm" (click)="abrirPreviewArchivo(previewUrl)">
+                      Ver archivo
+                    </button>
+                  </div>
+                </div>
 
                 <div class="evidencia-actions">
                   <button type="button" class="btn-danger" (click)="eliminarEvidencia(i)">
@@ -499,8 +535,6 @@ interface PasoFormulario {
           </section>
         </article>
 
-        <p class="error-text" *ngIf="errorGeneral">{{ errorGeneral }}</p>
-
         <div class="actions-row actions-row-wizard">
           <button type="button" class="btn-secondary" (click)="anteriorPaso()" [disabled]="esPrimerPaso">
             Anterior
@@ -571,6 +605,9 @@ interface PasoFormulario {
           </div>
 
           <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="cancelarModalTipoActa()">
+              Cancelar
+            </button>
             <button
               type="button"
               class="btn-primary"
@@ -1071,6 +1108,39 @@ interface PasoFormulario {
         justify-content: flex-end;
       }
 
+      .evidencia-preview {
+        border: 1px dashed #c9d6e4;
+        border-radius: 10px;
+        background: #f8fbff;
+        padding: 0.55rem;
+        display: grid;
+        place-items: center;
+      }
+
+      .evidencia-preview img {
+        width: 100%;
+        max-width: 240px;
+        max-height: 160px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #d2dfec;
+      }
+
+      .pdf-preview {
+        width: 100%;
+        max-width: 240px;
+        min-height: 92px;
+        border: 1px solid #d2dfec;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 0.6rem;
+        display: grid;
+        gap: 0.45rem;
+        justify-items: center;
+        align-items: center;
+        text-align: center;
+      }
+
       .resumen-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1218,7 +1288,7 @@ interface PasoFormulario {
     `,
   ],
 })
-export class CasoFormComponent implements OnInit {
+export class CasoFormComponent implements OnInit, OnDestroy {
   readonly authService = inject(AuthService);
 
   private readonly fb = inject(FormBuilder);
@@ -1278,6 +1348,25 @@ export class CasoFormComponent implements OnInit {
   });
 
   readonly evidenciasFormArray = this.fb.array<FormGroup>([]);
+  readonly estadosCiviles = [
+    'Soltero(a)',
+    'Casado(a)',
+    'Divorciado(a)',
+    'Viudo(a)',
+    'Separado(a)',
+    'Unión civil',
+  ];
+  readonly nacionalidadesFrecuentes = [
+    'Venezuela',
+    'Bolivia',
+    'Colombia',
+    'Cuba',
+    'Rep. Dominicana',
+    'Haití',
+    'Perú',
+    'Ecuador',
+    'Otra',
+  ];
 
   get modoEdicion(): boolean {
     return Boolean(this.casoId);
@@ -1409,11 +1498,21 @@ export class CasoFormComponent implements OnInit {
     return fecha ? String(fecha.getFullYear()) : '----';
   }
 
+  get fechaNacimientoMaxMenorIso(): string {
+    return this.formatearFechaIso(new Date());
+  }
+
+  get fechaNacimientoMinMenorIso(): string {
+    const min = new Date();
+    min.setFullYear(min.getFullYear() - 18);
+    return this.formatearFechaIso(min);
+  }
+
   get placeholderEstadoSalud(): string {
     const presentaLesiones = this.form.get('presentaLesiones')?.value === true;
     return presentaLesiones
       ? 'Ej: Lesión superficial / condición observada'
-      : 'Ej: Sin lesiones observables';
+      : 'Bloqueado: seleccionar "Sí" en presenta lesiones';
   }
 
   get indicesTodasLasPersonas(): number[] {
@@ -1442,6 +1541,8 @@ export class CasoFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.inicializarReglaEstadoSalud();
+
     const id = this.route.snapshot.paramMap.get('id');
 
     if (id) {
@@ -1456,14 +1557,23 @@ export class CasoFormComponent implements OnInit {
     this.sincronizarPersonasSegunActa('MAYOR');
   }
 
+  ngOnDestroy(): void {
+    this.liberarPreviewsTemporales();
+  }
+
   crearPersonaForm(tipo: TipoPersona = 'ACOMPANANTE'): FormGroup {
+    const validadoresEdad = [Validators.required, Validators.min(0)];
+    if (tipo === 'MENOR') {
+      validadoresEdad.push(Validators.max(18));
+    }
+
     return this.fb.group({
       tipoPersona: [tipo, Validators.required],
       nombres: ['', Validators.required],
       apellidos: ['', Validators.required],
       nacionalidad: ['', Validators.required],
       fechaNacimiento: ['', Validators.required],
-      edad: [null, [Validators.required, Validators.min(0)]],
+      edad: [null, validadoresEdad],
       lugarNacimiento: [''],
       numeroDocumento: ['', Validators.required],
       profesionOficio: [''],
@@ -1533,6 +1643,18 @@ export class CasoFormComponent implements OnInit {
     this.errorGeneral = '';
   }
 
+  cancelarModalTipoActa(): void {
+    if (!this.tipoActaConfirmada) {
+      this.mostrarModalActa = false;
+      this.errorGeneral = '';
+      void this.router.navigate([this.authService.resolveHomeByRole()]);
+      return;
+    }
+
+    this.mostrarModalActa = false;
+    this.errorGeneral = '';
+  }
+
   actualizarEdad(index: number): void {
     const persona = this.personaFormAt(index);
     const fechaNacimiento = persona.get('fechaNacimiento')?.value as string;
@@ -1541,16 +1663,13 @@ export class CasoFormComponent implements OnInit {
       return;
     }
 
-    const birth = new Date(fechaNacimiento);
-    const today = new Date();
-    let edad = today.getFullYear() - birth.getFullYear();
-    const mes = today.getMonth() - birth.getMonth();
-
-    if (mes < 0 || (mes === 0 && today.getDate() < birth.getDate())) {
-      edad -= 1;
+    const edad = this.calcularEdadDesdeFecha(fechaNacimiento);
+    if (edad === null) {
+      persona.patchValue({ edad: null }, { emitEvent: false });
+      return;
     }
 
-    persona.patchValue({ edad: Math.max(edad, 0) });
+    persona.patchValue({ edad }, { emitEvent: false });
   }
 
   agregarMenor(): void {
@@ -1613,18 +1732,28 @@ export class CasoFormComponent implements OnInit {
   }
 
   agregarEvidencia(): void {
-    this.evidenciasFormArray.push(
-      this.fb.group({
-        tipoEvidencia: ['ADJUNTO_GENERAL' as TipoEvidencia, Validators.required],
-        personaRef: [''],
-        archivoNombre: [''],
-        archivoObj: [null as File | null],
-        archivoError: [''],
-      }),
-    );
+    const evidenciaForm = this.fb.group({
+      tipoEvidencia: ['ADJUNTO_GENERAL' as TipoEvidencia, Validators.required],
+      personaRef: [''],
+      archivoNombre: [''],
+      archivoObj: [null as File | null],
+      archivoError: [''],
+      previewUrl: [''],
+      previewEsImagen: [false],
+      previewEsPdf: [false],
+    });
+
+    evidenciaForm.get('tipoEvidencia')?.valueChanges.subscribe((tipo) => {
+      this.sincronizarPersonaEvidencia(evidenciaForm, tipo as TipoEvidencia);
+    });
+    this.sincronizarPersonaEvidencia(evidenciaForm, 'ADJUNTO_GENERAL');
+
+    this.evidenciasFormArray.push(evidenciaForm);
   }
 
   eliminarEvidencia(index: number): void {
+    const evidenciaForm = this.evidenciaFormAt(index);
+    this.limpiarPreviewTemporal(evidenciaForm);
     this.evidenciasFormArray.removeAt(index);
   }
 
@@ -1632,10 +1761,15 @@ export class CasoFormComponent implements OnInit {
     return this.evidenciasFormArray.at(index) as FormGroup;
   }
 
+  tipoEvidenciaRequierePersona(tipo: TipoEvidencia | null | undefined): boolean {
+    return tipo === 'FOTO_PERSONA' || tipo === 'DOCUMENTO_IDENTIDAD';
+  }
+
   onArchivoEvidenciaChange(event: Event, index: number): void {
     const target = event.target as HTMLInputElement | null;
     const file = target?.files?.[0] ?? null;
     const evidenciaForm = this.evidenciaFormAt(index);
+    this.limpiarPreviewTemporal(evidenciaForm);
 
     if (!file) {
       evidenciaForm.patchValue({
@@ -1650,11 +1784,13 @@ export class CasoFormComponent implements OnInit {
     const extensionesPermitidas = ['jpg', 'jpeg', 'png', 'pdf'];
 
     if (!extensionesPermitidas.includes(extension)) {
+      const mensaje = 'Formato no permitido. Usa JPG, JPEG, PNG o PDF.';
       evidenciaForm.patchValue({
         archivoNombre: '',
         archivoObj: null,
-        archivoError: 'Formato no permitido. Usa JPG, JPEG, PNG o PDF.',
+        archivoError: mensaje,
       });
+      this.abrirAlertaAviso(`Evidencia ${index + 1}: ${mensaje}`);
       if (target) {
         target.value = '';
       }
@@ -1662,11 +1798,13 @@ export class CasoFormComponent implements OnInit {
     }
 
     if (file.size > this.maxUploadSizeBytes) {
+      const mensaje = `El archivo supera ${this.maxUploadMb} MB.`;
       evidenciaForm.patchValue({
         archivoNombre: '',
         archivoObj: null,
-        archivoError: `El archivo supera ${this.maxUploadMb} MB.`,
+        archivoError: mensaje,
       });
+      this.abrirAlertaAviso(`Evidencia ${index + 1}: ${mensaje}`);
       if (target) {
         target.value = '';
       }
@@ -1678,6 +1816,14 @@ export class CasoFormComponent implements OnInit {
       archivoObj: file,
       archivoError: '',
     });
+    this.aplicarPreviewTemporal(evidenciaForm, file);
+  }
+
+  abrirPreviewArchivo(url: string): void {
+    if (!url) {
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   irAPaso(index: number): void {
@@ -1774,7 +1920,8 @@ export class CasoFormComponent implements OnInit {
     const personas = this.personas.getRawValue();
 
     if (personas.length === 0) {
-      this.errorGeneral = 'Debe ingresar al menos una persona en el caso.';
+      this.errorGeneral = '';
+      this.abrirAlertaAviso('Debe ingresar al menos una persona en el caso.');
       return false;
     }
 
@@ -1783,12 +1930,14 @@ export class CasoFormComponent implements OnInit {
     ).length;
 
     if (totalPrincipales === 0) {
-      this.errorGeneral = 'Debe existir una persona principal.';
+      this.errorGeneral = '';
+      this.abrirAlertaAviso('Debe existir una persona principal.');
       return false;
     }
 
     if (totalPrincipales > 1) {
-      this.errorGeneral = 'Solo puede existir una persona principal por caso.';
+      this.errorGeneral = '';
+      this.abrirAlertaAviso('Solo puede existir una persona principal por caso.');
       return false;
     }
 
@@ -1799,28 +1948,36 @@ export class CasoFormComponent implements OnInit {
 
     if (this.esActaMayor) {
       if (personas.length !== 1 || totalMenores > 0) {
-        this.errorGeneral =
-          'El formato de mayor de edad admite una sola persona principal.';
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          'El formato de mayor de edad admite una sola persona principal.',
+        );
         return false;
       }
     }
 
     if (this.esActaConMenor) {
       if (totalMenores < 1 || personas.length < 2) {
-        this.errorGeneral =
-          'El formato con menor de edad requiere 1 persona principal y al menos 1 menor.';
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          'El formato con menor de edad requiere 1 persona principal y al menos 1 menor.',
+        );
         return false;
       }
 
       if (totalNoPermitidosConMenor > 0) {
-        this.errorGeneral =
-          'En este formato solo se permiten 1 persona principal y menores de edad.';
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          'En este formato solo se permiten 1 persona principal y menores de edad.',
+        );
         return false;
       }
 
       if (personas.length !== totalMenores + 1) {
-        this.errorGeneral =
-          'La composición del caso con menor debe ser 1 persona principal y uno o más menores.';
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          'La composición del caso con menor debe ser 1 persona principal y uno o más menores.',
+        );
         return false;
       }
     }
@@ -1833,12 +1990,12 @@ export class CasoFormComponent implements OnInit {
 
     if (paso === 'procedimiento') {
       this.marcarControlesTocados(['tipoControl', 'fechaHoraProcedimiento', 'lugar']);
-      if (
-        this.form.get('tipoControl')?.invalid ||
-        this.form.get('fechaHoraProcedimiento')?.invalid ||
-        this.form.get('lugar')?.invalid
-      ) {
-        this.errorGeneral = 'Completa los datos obligatorios del procedimiento.';
+      const camposFaltantes = this.obtenerCamposFaltantesProcedimiento();
+      if (camposFaltantes.length > 0) {
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          this.construirMensajeCamposFaltantesProcedimiento(camposFaltantes),
+        );
         return false;
       }
 
@@ -1846,9 +2003,15 @@ export class CasoFormComponent implements OnInit {
     }
 
     if (paso === 'antecedentes_personales') {
-      const validoAdultos = this.validarPersonasPorIndices([this.indicePersonaPrincipal]);
-      if (!validoAdultos) {
-        this.errorGeneral = 'Completa los campos obligatorios de antecedentes personales.';
+      const faltantesPrincipal = this.obtenerCamposFaltantesPersona(this.indicePersonaPrincipal);
+      if (faltantesPrincipal.length > 0) {
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          this.construirMensajeCamposFaltantesSeccion(
+            'antecedentes personales',
+            faltantesPrincipal,
+          ),
+        );
         return false;
       }
 
@@ -1861,38 +2024,42 @@ export class CasoFormComponent implements OnInit {
       }
 
       const indicesMenores = this.indicesPersonasMenores;
-      const validoMenores = this.validarPersonasPorIndices(indicesMenores);
-      if (!validoMenores) {
-        this.errorGeneral = 'Completa los campos obligatorios de antecedentes de menor.';
-        return false;
+      for (let i = 0; i < indicesMenores.length; i += 1) {
+        const indiceMenor = indicesMenores[i];
+        const faltantesMenor = this.obtenerCamposFaltantesPersona(indiceMenor);
+        if (faltantesMenor.length > 0) {
+          this.errorGeneral = '';
+          this.abrirAlertaAviso(
+            this.construirMensajeCamposFaltantesSeccion(
+              `antecedentes de menor ${i + 1}`,
+              faltantesMenor,
+            ),
+          );
+          return false;
+        }
       }
 
       return this.validarComposicionGrupo();
     }
 
-    if (paso === 'evidencias') {
-      const tieneErrores = this.evidenciasFormArray.controls.some((control) => {
-        const archivoError = (control.get('archivoError')?.value as string | null) ?? '';
-        return archivoError.trim().length > 0;
-      });
-
-      if (tieneErrores) {
-        this.errorGeneral = 'Corrige los errores de archivos en evidencias antes de continuar.';
-        return false;
-      }
-
-      const filasSinArchivo = this.evidenciasFormArray.controls.some((control) => {
-        const archivoObj = control.get('archivoObj')?.value as File | null;
-        return !archivoObj;
-      });
-
-      if (filasSinArchivo && this.evidenciasFormArray.length > 0) {
-        this.errorGeneral =
-          'Hay evidencias agregadas sin archivo. Selecciona el archivo o elimina la fila.';
+    if (paso === 'antecedentes_migratorios') {
+      const faltantesMigratorios = this.obtenerCamposFaltantesMigratorios();
+      if (faltantesMigratorios.length > 0) {
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          this.construirMensajeCamposFaltantesSeccion(
+            'antecedentes migratorios',
+            faltantesMigratorios,
+          ),
+        );
         return false;
       }
 
       return true;
+    }
+
+    if (paso === 'evidencias') {
+      return this.validarEvidenciasAntesDeGuardar();
     }
 
     if (paso === 'observaciones') {
@@ -1916,7 +2083,13 @@ export class CasoFormComponent implements OnInit {
       }
 
       if (this.form.invalid) {
-        this.errorGeneral = 'Revisa los campos obligatorios pendientes en el formulario.';
+        const pendientes = this.obtenerPendientesResumen();
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          pendientes.length > 0
+            ? `Revisa los datos pendientes: ${this.formatearListaCampos(pendientes)}.`
+            : 'Revisa los campos obligatorios pendientes en el formulario.',
+        );
         return false;
       }
 
@@ -1936,6 +2109,10 @@ export class CasoFormComponent implements OnInit {
     }
 
     if (!this.validarPasoActual()) {
+      return;
+    }
+
+    if (!this.validarEvidenciasAntesDeGuardar()) {
       return;
     }
 
@@ -2000,10 +2177,11 @@ export class CasoFormComponent implements OnInit {
       this.evidenciasExistentes = [...(casoGuardado.evidencias ?? this.evidenciasExistentes)];
       this.rutaRedireccionPostExito = ['/casos', casoGuardado.id];
       this.abrirAlertaExito(this.modoEdicion ? 'Caso actualizado correctamente.' : 'Caso creado correctamente.');
-    } catch (_error) {
+    } catch (error) {
       this.guardando = false;
-      this.errorGeneral =
-        'No fue posible guardar el caso. Revisa los datos e inténtalo nuevamente.';
+      const mensaje = this.obtenerMensajeErrorGuardado(error);
+      this.errorGeneral = '';
+      this.abrirAlertaAviso(mensaje);
     }
   }
 
@@ -2057,6 +2235,70 @@ export class CasoFormComponent implements OnInit {
     return this.casosService.subirEvidencia(caso.id, formData);
   }
 
+  private aplicarPreviewTemporal(evidenciaForm: FormGroup, file: File): void {
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const esImagen = ['jpg', 'jpeg', 'png'].includes(extension);
+    const esPdf = extension === 'pdf';
+
+    if (!esImagen && !esPdf) {
+      evidenciaForm.patchValue({
+        previewUrl: '',
+        previewEsImagen: false,
+        previewEsPdf: false,
+      });
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    evidenciaForm.patchValue({
+      previewUrl,
+      previewEsImagen: esImagen,
+      previewEsPdf: esPdf,
+    });
+  }
+
+  private limpiarPreviewTemporal(evidenciaForm: FormGroup): void {
+    const urlActual = (evidenciaForm.get('previewUrl')?.value as string | null) ?? '';
+    if (urlActual.startsWith('blob:')) {
+      URL.revokeObjectURL(urlActual);
+    }
+
+    evidenciaForm.patchValue({
+      previewUrl: '',
+      previewEsImagen: false,
+      previewEsPdf: false,
+    });
+  }
+
+  private liberarPreviewsTemporales(): void {
+    this.evidenciasFormArray.controls.forEach((control) => {
+      this.limpiarPreviewTemporal(control as FormGroup);
+    });
+  }
+
+  private sincronizarPersonaEvidencia(
+    evidenciaForm: FormGroup,
+    tipo: TipoEvidencia | null | undefined,
+  ): void {
+    const personaControl = evidenciaForm.get('personaRef');
+    if (!personaControl) {
+      return;
+    }
+
+    if (!this.tipoEvidenciaRequierePersona(tipo)) {
+      return;
+    }
+
+    const valorActual = (personaControl.value as string | null) ?? '';
+    if (valorActual !== '') {
+      return;
+    }
+
+    personaControl.setValue(String(this.indicePersonaPrincipal), {
+      emitEvent: false,
+    });
+  }
+
   etiquetaTipoEvidencia(tipo: TipoEvidencia): string {
     if (tipo === 'FOTO_PERSONA') {
       return 'Foto persona';
@@ -2099,6 +2341,20 @@ export class CasoFormComponent implements OnInit {
     this.alertaAvisoMensaje = '';
   }
 
+  private obtenerMensajeErrorGuardado(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      if (Array.isArray(error.error?.message) && error.error.message.length > 0) {
+        return error.error.message.join(' | ');
+      }
+
+      if (typeof error.error?.message === 'string' && error.error.message.trim().length > 0) {
+        return error.error.message;
+      }
+    }
+
+    return 'No fue posible guardar el caso. Revisa los datos e inténtalo nuevamente.';
+  }
+
   private construirObservacionesFinal(observacionesRaw: string): string | undefined {
     const observacionesBase = this.extraerObservacionesBase(observacionesRaw);
     return observacionesBase || undefined;
@@ -2123,18 +2379,255 @@ export class CasoFormComponent implements OnInit {
     });
   }
 
-  private validarPersonasPorIndices(indices: number[]): boolean {
-    let valido = true;
+  private obtenerCamposFaltantesProcedimiento(): string[] {
+    const faltantes: string[] = [];
 
-    indices.forEach((index) => {
-      const grupo = this.personaFormAt(index);
-      grupo.markAllAsTouched();
-      if (grupo.invalid) {
-        valido = false;
+    const tipoControl = this.form.get('tipoControl')?.value as string | null;
+    if (!tipoControl || tipoControl.trim().length === 0) {
+      faltantes.push('tipo de control');
+    }
+
+    const fechaHora = this.form.get('fechaHoraProcedimiento')?.value as string | null;
+    if (!fechaHora || fechaHora.trim().length === 0) {
+      faltantes.push('fecha y hora del procedimiento');
+    }
+
+    const lugar = this.form.get('lugar')?.value as string | null;
+    if (!lugar || lugar.trim().length === 0) {
+      faltantes.push('lugar');
+    }
+
+    return faltantes;
+  }
+
+  private construirMensajeCamposFaltantesProcedimiento(camposFaltantes: string[]): string {
+    return `Falta completar ${this.formatearListaCampos(camposFaltantes)}.`;
+  }
+
+  private construirMensajeCamposFaltantesSeccion(
+    seccion: string,
+    camposFaltantes: string[],
+  ): string {
+    return `En ${seccion} falta completar ${this.formatearListaCampos(camposFaltantes)}.`;
+  }
+
+  private formatearListaCampos(items: string[]): string {
+    if (items.length === 1) {
+      return items[0] ?? '';
+    }
+
+    if (items.length === 2) {
+      return `${items[0]} y ${items[1]}`;
+    }
+
+    const ultimo = items[items.length - 1] ?? '';
+    const primeros = items.slice(0, -1).join(', ');
+    return `${primeros} y ${ultimo}`;
+  }
+
+  private validarEvidenciasAntesDeGuardar(): boolean {
+    const tieneErrores = this.evidenciasFormArray.controls.some((control) => {
+      const archivoError = (control.get('archivoError')?.value as string | null) ?? '';
+      return archivoError.trim().length > 0;
+    });
+
+    if (tieneErrores) {
+      const primeraConError = this.evidenciasFormArray.controls.findIndex((control) => {
+        const archivoError = (control.get('archivoError')?.value as string | null) ?? '';
+        return archivoError.trim().length > 0;
+      });
+      const detalleError =
+        primeraConError >= 0
+          ? ((this.evidenciasFormArray.at(primeraConError) as FormGroup).get('archivoError')
+              ?.value as string | null) ?? ''
+          : '';
+      this.errorGeneral = '';
+      this.abrirAlertaAviso(
+        detalleError.trim().length > 0
+          ? `Evidencia ${primeraConError + 1}: ${detalleError}`
+          : 'Corrige los errores de archivos en evidencias antes de continuar.',
+      );
+      return false;
+    }
+
+    const filasSinArchivo = this.evidenciasFormArray.controls
+      .map((control, index) => ({
+        index,
+        archivoObj: control.get('archivoObj')?.value as File | null,
+      }))
+      .filter((item) => !item.archivoObj)
+      .map((item) => item.index + 1);
+
+    if (filasSinArchivo.length > 0) {
+      this.errorGeneral = '';
+      this.abrirAlertaAviso(
+        `Falta seleccionar archivo en la evidencia ${this.formatearListaCampos(filasSinArchivo.map((fila) => String(fila)))}.`,
+      );
+      return false;
+    }
+
+    for (let i = 0; i < this.evidenciasFormArray.length; i += 1) {
+      const evidenciaForm = this.evidenciaFormAt(i);
+      const tipo = (evidenciaForm.get('tipoEvidencia')?.value as TipoEvidencia | null) ?? 'ADJUNTO_GENERAL';
+      const personaRef = (evidenciaForm.get('personaRef')?.value as string | null) ?? '';
+
+      if (!this.tipoEvidenciaRequierePersona(tipo)) {
+        continue;
+      }
+
+      if (personaRef === '') {
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          `Evidencia ${i + 1}: selecciona la persona asociada para ${this.etiquetaTipoEvidencia(tipo).toLowerCase()}.`,
+        );
+        return false;
+      }
+
+      const personaIndex = Number(personaRef);
+      if (Number.isNaN(personaIndex) || !this.personas.at(personaIndex)) {
+        this.errorGeneral = '';
+        this.abrirAlertaAviso(
+          `Evidencia ${i + 1}: la persona asociada seleccionada no es válida.`,
+        );
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private obtenerCamposFaltantesPersona(index: number): string[] {
+    const persona = this.personaFormAt(index);
+    persona.markAllAsTouched();
+
+    const faltantes: string[] = [];
+    const tipoPersona = (persona.get('tipoPersona')?.value as TipoPersona) ?? 'ACOMPANANTE';
+    const campos: Array<{ control: string; etiqueta: string }> = [
+      { control: 'nombres', etiqueta: 'nombres' },
+      { control: 'apellidos', etiqueta: 'apellidos' },
+      { control: 'nacionalidad', etiqueta: 'nacionalidad' },
+      { control: 'fechaNacimiento', etiqueta: 'fecha de nacimiento' },
+      { control: 'numeroDocumento', etiqueta: 'documento de identidad' },
+    ];
+
+    campos.forEach((campo) => {
+      const valor = persona.get(campo.control)?.value;
+      const texto = typeof valor === 'string' ? valor.trim() : '';
+      if (!texto) {
+        faltantes.push(campo.etiqueta);
       }
     });
 
-    return valido;
+    const edadControl = persona.get('edad');
+    const edadRaw = edadControl?.value;
+    const edadNumero = Number(edadRaw);
+    if (edadRaw === null || edadRaw === '' || Number.isNaN(edadNumero) || edadNumero < 0) {
+      faltantes.push('edad');
+    } else if (tipoPersona === 'MENOR' && edadNumero > 18) {
+      faltantes.push('edad (debe ser 18 años o menor)');
+    }
+
+    if (tipoPersona === 'MENOR') {
+      const fechaNacimiento = (persona.get('fechaNacimiento')?.value as string | null)?.trim() ?? '';
+      const edadCalculada = this.calcularEdadDesdeFecha(fechaNacimiento);
+      if (!fechaNacimiento || edadCalculada === null || edadCalculada > 18 || edadCalculada < 0) {
+        faltantes.push('fecha de nacimiento válida para menor de edad');
+      }
+    }
+
+    return Array.from(new Set(faltantes));
+  }
+
+  private obtenerCamposFaltantesMigratorios(): string[] {
+    const faltantes: string[] = [];
+    const fechaIngreso = this.form.get('fechaIngreso')?.value as string | null;
+    const estadoSalud = this.form.get('estadoSalud')?.value as string | null;
+    const documentado = this.form.get('documentado')?.value as boolean | null;
+    const presentaLesiones = this.form.get('presentaLesiones')?.value as boolean | null;
+
+    if (!fechaIngreso || fechaIngreso.trim().length === 0) {
+      faltantes.push('fecha de ingreso');
+    }
+
+    if (documentado === null || documentado === undefined) {
+      faltantes.push('documentado');
+    }
+
+    if (presentaLesiones === null || presentaLesiones === undefined) {
+      faltantes.push('presenta lesiones');
+    }
+
+    if (presentaLesiones === true && (!estadoSalud || estadoSalud.trim().length === 0)) {
+      faltantes.push('detalle de lesión');
+    }
+
+    return faltantes;
+  }
+
+  private inicializarReglaEstadoSalud(): void {
+    const controlLesiones = this.form.get('presentaLesiones');
+    if (!controlLesiones) {
+      return;
+    }
+
+    this.aplicarReglaEstadoSalud(controlLesiones.value === true, false);
+    controlLesiones.valueChanges.subscribe((valor) => {
+      this.aplicarReglaEstadoSalud(valor === true, true);
+    });
+  }
+
+  private aplicarReglaEstadoSalud(
+    presentaLesiones: boolean,
+    limpiarDetalleCuandoNoLesiones: boolean,
+  ): void {
+    const controlEstadoSalud = this.form.get('estadoSalud');
+    if (!controlEstadoSalud) {
+      return;
+    }
+
+    if (presentaLesiones) {
+      controlEstadoSalud.enable({ emitEvent: false });
+      controlEstadoSalud.setValidators([Validators.required]);
+      controlEstadoSalud.updateValueAndValidity({ emitEvent: false });
+      return;
+    }
+
+    if (limpiarDetalleCuandoNoLesiones) {
+      controlEstadoSalud.setValue('', { emitEvent: false });
+    }
+    controlEstadoSalud.clearValidators();
+    controlEstadoSalud.disable({ emitEvent: false });
+    controlEstadoSalud.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private obtenerPendientesResumen(): string[] {
+    const pendientes = new Set<string>();
+
+    this.obtenerCamposFaltantesProcedimiento().forEach((campo) =>
+      pendientes.add(`procedimiento: ${campo}`),
+    );
+
+    this.obtenerCamposFaltantesPersona(this.indicePersonaPrincipal).forEach((campo) =>
+      pendientes.add(`antecedentes personales: ${campo}`),
+    );
+
+    if (this.esActaConMenor) {
+      this.indicesPersonasMenores.forEach((indiceMenor, idx) => {
+        this.obtenerCamposFaltantesPersona(indiceMenor).forEach((campo) => {
+          pendientes.add(`antecedentes de menor ${idx + 1}: ${campo}`);
+        });
+      });
+    }
+
+    this.obtenerCamposFaltantesMigratorios().forEach((campo) =>
+      pendientes.add(`antecedentes migratorios: ${campo}`),
+    );
+
+    if (this.form.get('tomaConocimiento')?.invalid) {
+      pendientes.add('toma de conocimiento y conformidad');
+    }
+
+    return Array.from(pendientes);
   }
 
   private ajustarPasoActual(): void {
@@ -2144,6 +2637,44 @@ export class CasoFormComponent implements OnInit {
     }
 
     this.pasoActual = 'antecedentes_migratorios';
+  }
+
+  private calcularEdadDesdeFecha(fechaIso: string): number | null {
+    if (!fechaIso || !fechaIso.includes('-')) {
+      return null;
+    }
+
+    const partes = fechaIso.split('-').map((parte) => Number(parte));
+    if (partes.length !== 3 || partes.some((parte) => Number.isNaN(parte))) {
+      return null;
+    }
+
+    const [anio, mes, dia] = partes;
+    if (!anio || !mes || !dia) {
+      return null;
+    }
+
+    const nacimiento = new Date(anio, mes - 1, dia);
+    if (Number.isNaN(nacimiento.getTime())) {
+      return null;
+    }
+
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const diferenciaMes = hoy.getMonth() - nacimiento.getMonth();
+
+    if (diferenciaMes < 0 || (diferenciaMes === 0 && hoy.getDate() < nacimiento.getDate())) {
+      edad -= 1;
+    }
+
+    return edad;
+  }
+
+  private formatearFechaIso(fecha: Date): string {
+    const anio = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    return `${anio}-${mes}-${dia}`;
   }
 
   private sincronizarPersonasSegunActa(tipoActa: TipoActa): void {

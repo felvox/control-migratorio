@@ -3,9 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, catchError, map, of, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  ChangePasswordRequest,
   LoginRequest,
   LoginResponse,
+  MasterCandidate,
   Rol,
+  TransferMasterRequest,
   UsuarioSesion,
 } from '../models/auth.model';
 
@@ -36,7 +39,15 @@ export class AuthService {
 
     if (token && rawUser) {
       try {
-        const user = JSON.parse(rawUser) as UsuarioSesion;
+        const userRaw = JSON.parse(rawUser) as Partial<UsuarioSesion>;
+        const user: UsuarioSesion = {
+          id: userRaw.id ?? '',
+          run: userRaw.run ?? '',
+          nombreCompleto: userRaw.nombreCompleto ?? '',
+          rol: (userRaw.rol as UsuarioSesion['rol']) ?? 'CONSULTA',
+          esMaster: Boolean(userRaw.esMaster),
+          jaf: userRaw.jaf ?? null,
+        };
         this.userSubject.next(user);
         this.tokenSubject.next(token);
       } catch (_error) {
@@ -78,6 +89,18 @@ export class AuthService {
         return of(null);
       }),
     );
+  }
+
+  changePassword(payload: ChangePasswordRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/change-password`, payload);
+  }
+
+  listMasterCandidates(): Observable<MasterCandidate[]> {
+    return this.http.get<MasterCandidate[]>(`${this.apiUrl}/auth/master-candidates`);
+  }
+
+  transferMaster(payload: TransferMasterRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/transfer-master`, payload);
   }
 
   get token(): string | null {

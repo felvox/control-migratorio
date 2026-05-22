@@ -1,4 +1,4 @@
-import { EstadoCaso } from '@prisma/client';
+import { EstadoCaso, Jaf } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
@@ -51,6 +51,10 @@ export class QueryCasosDto {
   @IsOptional()
   @IsString()
   nacionalidad?: string;
+
+  @IsOptional()
+  @IsEnum(Jaf)
+  jaf?: Jaf;
 
   @IsOptional()
   @Type(() => Number)

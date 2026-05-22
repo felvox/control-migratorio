@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsIn,
   IsOptional,
   IsString,
@@ -9,6 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Jaf } from '@prisma/client';
 import { PersonaCasoDto } from './persona-caso.dto';
 import {
   TIPOS_CONTROL_PERMITIDOS,
@@ -16,6 +18,10 @@ import {
 } from '../../../common/constants/tipo-control.const';
 
 export class CreateCasoDto {
+  @IsOptional()
+  @IsEnum(Jaf)
+  jaf?: Jaf;
+
   @IsIn(TIPOS_CONTROL_PERMITIDOS)
   tipoControl: TipoControlPermitido;
 

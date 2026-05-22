@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Jaf, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -11,20 +13,107 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { QueryUsuariosDto } from './dto/query-usuarios.dto';
 import { hashPassword } from '../../common/utils/password.util';
 import { AuditoriaService } from '../auditoria/auditoria.service';
-import { normalizeRun } from '../../common/utils/run.util';
+import { isRunChilenoValido, normalizeRun } from '../../common/utils/run.util';
+import { AuthUser } from '../../common/interfaces/auth-user.interface';
 
 @Injectable()
 export class UsuariosService {
+  private readonly rolesConJaf = new Set<Role>([
+    Role.ADMINISTRADOR,
+    Role.OPERADOR,
+    Role.CONSULTA,
+  ]);
+  private readonly rolesGestionablesPorOperativo = new Set<Role>([
+    Role.OPERADOR,
+    Role.CONSULTA,
+  ]);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoriaService: AuditoriaService,
   ) {}
 
+  private esAdministradorOperativo(actor: AuthUser): boolean {
+    return actor.role === Role.ADMINISTRADOR && !actor.esMaster;
+  }
+
+  private obtenerJafActor(actor: AuthUser): Jaf {
+    if (!actor.jaf) {
+      throw new ForbiddenException(
+        'Administrador operativo sin JAF asignada. Contacte al Administrador Master.',
+      );
+    }
+
+    return actor.jaf;
+  }
+
+  private validarRolGestionable(actor: AuthUser, rol: Role) {
+    if (!this.esAdministradorOperativo(actor)) {
+      return;
+    }
+
+    if (!this.rolesGestionablesPorOperativo.has(rol)) {
+      if (rol === Role.AUDITOR) {
+        throw new ForbiddenException(
+          'Solo el Administrador Master puede crear o gestionar usuarios Auditor.',
+        );
+      }
+
+      throw new ForbiddenException(
+        'El Administrador Operativo solo puede gestionar usuarios Operador o Consulta.',
+      );
+    }
+  }
+
+  private validarAccesoUsuarioObjetivo(
+    actor: AuthUser,
+    usuario: { id: string; rol: Role; jaf: Jaf | null },
+  ) {
+    this.validarRolGestionable(actor, usuario.rol);
+
+    if (!this.esAdministradorOperativo(actor)) {
+      return;
+    }
+
+    const jafActor = this.obtenerJafActor(actor);
+    if (usuario.jaf !== jafActor) {
+      throw new ForbiddenException(
+        'El Administrador Operativo solo puede gestionar usuarios de su JAF.',
+      );
+    }
+  }
+
+  private resolverJafPorRol(
+    rol: Role,
+    jaf: Jaf | null | undefined,
+    actor: AuthUser,
+  ): Jaf | null {
+    if (this.rolesConJaf.has(rol)) {
+      if (this.esAdministradorOperativo(actor)) {
+        return this.obtenerJafActor(actor);
+      }
+
+      if (!jaf) {
+        throw new BadRequestException(
+          'Debe asignar una JAF para usuarios Administrador Operativo, Operador o Consulta',
+        );
+      }
+
+      return jaf;
+    }
+
+    return null;
+  }
+
   async crear(
     dto: CreateUsuarioDto,
-    actorId: string,
+    actor: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
+    if (!isRunChilenoValido(dto.run)) {
+      throw new BadRequestException('RUN chileno inválido');
+    }
+
     const runNormalizado = normalizeRun(dto.run);
     const grado = dto.grado.trim();
     const nombre = dto.nombre.trim();
@@ -36,57 +125,116 @@ export class UsuariosService {
       );
     }
 
-    const nombreCompleto = [grado, nombre, apellidos].join(' ');
+    this.validarRolGestionable(actor, dto.rol);
 
-    const existente = await this.prisma.usuario.findFirst({
+    const nombreCompleto = [grado, nombre, apellidos].join(' ');
+    const jaf = this.resolverJafPorRol(dto.rol, dto.jaf, actor);
+    const passwordHash = await hashPassword(dto.password);
+
+    const existente = await this.prisma.usuario.findUnique({
       where: {
         run: runNormalizado,
       },
-      select: { id: true },
+      select: {
+        id: true,
+        eliminadoAt: true,
+      },
     });
 
-    if (existente) {
+    if (existente && !existente.eliminadoAt) {
       throw new ConflictException('Ya existe un usuario con ese RUN');
     }
 
-    const usuario = await this.prisma.usuario.create({
+    if (existente && existente.eliminadoAt) {
+      const usuarioReactivado = await this.prisma.usuario.update({
+        where: {
+          id: existente.id,
+        },
+        data: {
+          run: runNormalizado,
+          nombreCompleto,
+          rol: dto.rol,
+          jaf,
+          esMaster: false,
+          activo: true,
+          eliminadoAt: null,
+          passwordHash,
+        },
+        select: {
+          id: true,
+          run: true,
+          nombreCompleto: true,
+          rol: true,
+          jaf: true,
+          activo: true,
+          creadoAt: true,
+        },
+      });
+
+      await this.auditoriaService.registrarAccion({
+        usuarioId: actor.id,
+        accion: 'REACTIVAR_USUARIO',
+        entidad: 'USUARIO',
+        entidadId: usuarioReactivado.id,
+        descripcion: `Usuario RUN ${usuarioReactivado.run} reactivado`,
+        ip: meta?.ip,
+        userAgent: meta?.userAgent,
+      });
+
+      return usuarioReactivado;
+    }
+
+    const usuarioCreado = await this.prisma.usuario.create({
       data: {
         run: runNormalizado,
         nombreCompleto,
         rol: dto.rol,
-        passwordHash: await hashPassword(dto.password),
+        jaf,
+        passwordHash,
       },
       select: {
         id: true,
         run: true,
         nombreCompleto: true,
         rol: true,
+        jaf: true,
         activo: true,
         creadoAt: true,
       },
     });
 
     await this.auditoriaService.registrarAccion({
-      usuarioId: actorId,
+      usuarioId: actor.id,
       accion: 'CREAR_USUARIO',
       entidad: 'USUARIO',
-      entidadId: usuario.id,
-      descripcion: `Usuario RUN ${usuario.run} creado`,
+      entidadId: usuarioCreado.id,
+      descripcion: `Usuario RUN ${usuarioCreado.run} creado`,
       ip: meta?.ip,
       userAgent: meta?.userAgent,
     });
 
-    return usuario;
+    return usuarioCreado;
   }
 
-  async listar(query: QueryUsuariosDto) {
+  async listar(query: QueryUsuariosDto, actor: AuthUser) {
     const pagina = query.pagina ?? 1;
     const limite = query.limite ?? 20;
     const skip = (pagina - 1) * limite;
 
-    const where = {
+    const esOperativo = this.esAdministradorOperativo(actor);
+    if (esOperativo && query.rol && !this.rolesGestionablesPorOperativo.has(query.rol)) {
+      throw new ForbiddenException(
+        'El Administrador Operativo solo puede listar usuarios Operador o Consulta.',
+      );
+    }
+
+    const where: Prisma.UsuarioWhereInput = {
       eliminadoAt: null,
-      rol: query.rol,
+      esMaster: false,
+      rol: esOperativo
+        ? query.rol ?? { in: [Role.OPERADOR, Role.CONSULTA] }
+        : query.rol,
+      jaf: esOperativo ? this.obtenerJafActor(actor) : query.jaf,
       activo: query.activo,
       OR: query.busqueda
         ? [
@@ -118,6 +266,7 @@ export class UsuariosService {
           run: true,
           nombreCompleto: true,
           rol: true,
+          jaf: true,
           activo: true,
           creadoAt: true,
           actualizadoAt: true,
@@ -146,17 +295,19 @@ export class UsuariosService {
     };
   }
 
-  async obtenerPorId(id: string) {
+  async obtenerPorId(id: string, actor: AuthUser) {
     const user = await this.prisma.usuario.findFirst({
       where: {
         id,
         eliminadoAt: null,
+        esMaster: false,
       },
       select: {
         id: true,
         run: true,
         nombreCompleto: true,
         rol: true,
+        jaf: true,
         activo: true,
         creadoAt: true,
         actualizadoAt: true,
@@ -167,20 +318,53 @@ export class UsuariosService {
       throw new NotFoundException('Usuario no encontrado');
     }
 
+    this.validarAccesoUsuarioObjetivo(actor, user);
+
     return user;
   }
 
   async actualizar(
     id: string,
     dto: UpdateUsuarioDto,
-    actorId: string,
+    actor: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    await this.obtenerPorId(id);
+    const usuarioActual = await this.prisma.usuario.findFirst({
+      where: {
+        id,
+        eliminadoAt: null,
+        esMaster: false,
+      },
+      select: {
+        id: true,
+        rol: true,
+        jaf: true,
+      },
+    });
+
+    if (!usuarioActual) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    this.validarAccesoUsuarioObjetivo(actor, usuarioActual);
+
+    if (dto.run && !isRunChilenoValido(dto.run)) {
+      throw new BadRequestException('RUN chileno inválido');
+    }
+
+    const rolObjetivo = dto.rol ?? usuarioActual.rol;
+    this.validarRolGestionable(actor, rolObjetivo);
+
+    const jafObjetivo = this.resolverJafPorRol(
+      rolObjetivo,
+      dto.jaf ?? usuarioActual.jaf,
+      actor,
+    );
 
     const data: Record<string, unknown> = {
       ...dto,
       run: dto.run ? normalizeRun(dto.run) : undefined,
+      jaf: jafObjetivo,
     };
 
     try {
@@ -192,13 +376,14 @@ export class UsuariosService {
           run: true,
           nombreCompleto: true,
           rol: true,
+          jaf: true,
           activo: true,
           actualizadoAt: true,
         },
       });
 
       await this.auditoriaService.registrarAccion({
-        usuarioId: actorId,
+        usuarioId: actor.id,
         accion: 'EDITAR_USUARIO',
         entidad: 'USUARIO',
         entidadId: id,
@@ -216,14 +401,14 @@ export class UsuariosService {
 
   async desactivar(
     id: string,
-    actorId: string,
+    actor: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    if (id === actorId) {
+    if (id === actor.id) {
       throw new BadRequestException('No puede desactivarse a sí mismo');
     }
 
-    await this.obtenerPorId(id);
+    await this.obtenerPorId(id, actor);
 
     const usuario = await this.prisma.usuario.update({
       where: { id },
@@ -236,7 +421,7 @@ export class UsuariosService {
     });
 
     await this.auditoriaService.registrarAccion({
-      usuarioId: actorId,
+      usuarioId: actor.id,
       accion: 'DESACTIVAR_USUARIO',
       entidad: 'USUARIO',
       entidadId: id,
@@ -250,15 +435,16 @@ export class UsuariosService {
 
   async activar(
     id: string,
-    actorId: string,
+    actor: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    await this.obtenerPorId(id);
+    await this.obtenerPorId(id, actor);
 
     const usuarioActual = await this.prisma.usuario.findFirst({
       where: {
         id,
         eliminadoAt: null,
+        esMaster: false,
       },
       select: {
         id: true,
@@ -286,7 +472,7 @@ export class UsuariosService {
     });
 
     await this.auditoriaService.registrarAccion({
-      usuarioId: actorId,
+      usuarioId: actor.id,
       accion: 'ACTIVAR_USUARIO',
       entidad: 'USUARIO',
       entidadId: id,
@@ -301,10 +487,10 @@ export class UsuariosService {
   async resetearPassword(
     id: string,
     dto: ResetPasswordDto,
-    actorId: string,
+    actor: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    await this.obtenerPorId(id);
+    await this.obtenerPorId(id, actor);
 
     await this.prisma.usuario.update({
       where: { id },
@@ -314,7 +500,7 @@ export class UsuariosService {
     });
 
     await this.auditoriaService.registrarAccion({
-      usuarioId: actorId,
+      usuarioId: actor.id,
       accion: 'RESET_PASSWORD_USUARIO',
       entidad: 'USUARIO',
       entidadId: id,
@@ -331,14 +517,14 @@ export class UsuariosService {
 
   async eliminarLogico(
     id: string,
-    actorId: string,
+    actor: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    if (id === actorId) {
+    if (id === actor.id) {
       throw new BadRequestException('No puede eliminarse a sí mismo');
     }
 
-    await this.obtenerPorId(id);
+    await this.obtenerPorId(id, actor);
 
     await this.prisma.usuario.update({
       where: { id },
@@ -349,7 +535,7 @@ export class UsuariosService {
     });
 
     await this.auditoriaService.registrarAccion({
-      usuarioId: actorId,
+      usuarioId: actor.id,
       accion: 'ELIMINAR_USUARIO',
       entidad: 'USUARIO',
       entidadId: id,

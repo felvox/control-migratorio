@@ -79,7 +79,11 @@ export const routes: Routes = [
         path: 'auditoria',
         component: AuditoriaComponent,
         canActivate: [roleGuard],
-        data: { roles: ['ADMINISTRADOR', 'AUDITOR'], pageTitle: 'Auditoría' },
+        data: {
+          roles: ['ADMINISTRADOR'],
+          requiresMaster: true,
+          pageTitle: 'Bitácora de actividad del sistema',
+        },
       },
       {
         path: 'consulta',

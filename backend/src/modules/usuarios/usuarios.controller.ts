@@ -35,20 +35,20 @@ export class UsuariosController {
     @CurrentUser() actor: AuthUser,
     @Req() req: Request,
   ) {
-    return this.usuariosService.crear(dto, actor.id, {
+    return this.usuariosService.crear(dto, actor, {
       ip: req.ip,
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
   }
 
   @Get()
-  listar(@Query() query: QueryUsuariosDto) {
-    return this.usuariosService.listar(query);
+  listar(@Query() query: QueryUsuariosDto, @CurrentUser() actor: AuthUser) {
+    return this.usuariosService.listar(query, actor);
   }
 
   @Get(':id')
-  obtenerPorId(@Param('id') id: string) {
-    return this.usuariosService.obtenerPorId(id);
+  obtenerPorId(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.usuariosService.obtenerPorId(id, actor);
   }
 
   @Patch(':id')
@@ -58,7 +58,7 @@ export class UsuariosController {
     @CurrentUser() actor: AuthUser,
     @Req() req: Request,
   ) {
-    return this.usuariosService.actualizar(id, dto, actor.id, {
+    return this.usuariosService.actualizar(id, dto, actor, {
       ip: req.ip,
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
@@ -70,7 +70,7 @@ export class UsuariosController {
     @CurrentUser() actor: AuthUser,
     @Req() req: Request,
   ) {
-    return this.usuariosService.desactivar(id, actor.id, {
+    return this.usuariosService.desactivar(id, actor, {
       ip: req.ip,
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
@@ -82,7 +82,7 @@ export class UsuariosController {
     @CurrentUser() actor: AuthUser,
     @Req() req: Request,
   ) {
-    return this.usuariosService.activar(id, actor.id, {
+    return this.usuariosService.activar(id, actor, {
       ip: req.ip,
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
@@ -95,7 +95,7 @@ export class UsuariosController {
     @CurrentUser() actor: AuthUser,
     @Req() req: Request,
   ) {
-    return this.usuariosService.resetearPassword(id, dto, actor.id, {
+    return this.usuariosService.resetearPassword(id, dto, actor, {
       ip: req.ip,
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
@@ -107,7 +107,7 @@ export class UsuariosController {
     @CurrentUser() actor: AuthUser,
     @Req() req: Request,
   ) {
-    return this.usuariosService.eliminarLogico(id, actor.id, {
+    return this.usuariosService.eliminarLogico(id, actor, {
       ip: req.ip,
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });

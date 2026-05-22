@@ -3,6 +3,7 @@ import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { DashboardService } from './dashboard.service';
+import { AlertModalComponent } from '../../shared/components/alert-modal.component';
 
 type TipoControlDashboard = 'INGRESO' | 'EGRESO';
 type EstadoDashboard =
@@ -44,13 +45,11 @@ interface DashboardResumen {
     menoresEdad: number;
     noDocumentados: number;
     conLesiones: number;
-    pendientesFirma: number;
     casosCerrados: number;
   };
   alertas: {
     menoresPendientes: number;
     lesionesRevision: number;
-    actasSinFirma: number;
     sinCierreOperativo: number;
   };
   ultimosCasos: CasoResumen[];
@@ -106,7 +105,7 @@ interface BarraNacionalidad {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AlertModalComponent],
   template: `
     <div class="dashboard-page" *ngIf="resumen as data; else loadingTpl">
       <section class="kpi-row" aria-label="Métricas principales">
@@ -139,14 +138,6 @@ interface BarraNacionalidad {
           <div>
             <label>Con lesiones</label>
             <strong>{{ data.metricasOperativas.conLesiones }}</strong>
-          </div>
-        </article>
-
-        <article class="kpi-card kpi-purple">
-          <div class="kpi-icon">✍️</div>
-          <div>
-            <label>Pendientes de firma</label>
-            <strong>{{ data.metricasOperativas.pendientesFirma }}</strong>
           </div>
         </article>
 
@@ -359,8 +350,23 @@ interface BarraNacionalidad {
     </div>
 
     <ng-template #loadingTpl>
-      <div class="loading-state">Cargando panel de control...</div>
+      <div class="loading-state" *ngIf="!errorCarga; else errorTpl">Cargando panel de control...</div>
     </ng-template>
+
+    <ng-template #errorTpl>
+      <div class="loading-state">
+        <p>{{ errorCarga }}</p>
+        <button type="button" class="btn-reintentar" (click)="reintentarCarga()">Reintentar</button>
+      </div>
+    </ng-template>
+
+    <app-alert-modal
+      [open]="alertAvisoAbierto"
+      title="Aviso"
+      [message]="alertaAvisoMensaje"
+      variant="warning"
+      (accepted)="cerrarAlertaAviso()"
+    />
   `,
   styles: [
     `
@@ -375,7 +381,7 @@ interface BarraNacionalidad {
 
       .kpi-row {
         display: grid;
-        grid-template-columns: repeat(6, minmax(145px, 1fr));
+        grid-template-columns: repeat(5, minmax(145px, 1fr));
         gap: 0.55rem;
       }
 
@@ -445,11 +451,6 @@ interface BarraNacionalidad {
       .kpi-red .kpi-icon,
       .kpi-red::after {
         background: #ef4444;
-      }
-
-      .kpi-purple .kpi-icon,
-      .kpi-purple::after {
-        background: #8b5cf6;
       }
 
       .kpi-teal .kpi-icon,
@@ -791,6 +792,23 @@ interface BarraNacionalidad {
 
       .loading-state {
         color: #475569;
+        display: grid;
+        gap: 0.5rem;
+      }
+
+      .loading-state p {
+        margin: 0;
+      }
+
+      .btn-reintentar {
+        justify-self: start;
+        border: 1px solid #b9d3f7;
+        background: #edf4ff;
+        color: #2d63c1;
+        border-radius: 8px;
+        padding: 0.28rem 0.7rem;
+        font-weight: 600;
+        cursor: pointer;
       }
 
       @media (max-width: 1024px) {
@@ -833,6 +851,9 @@ export class DashboardComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   resumen: DashboardResumen | null = null;
+  errorCarga = '';
+  alertAvisoAbierto = false;
+  alertaAvisoMensaje = '';
   fechaSeleccionada = new Date();
 
   paginaActual = 1;
@@ -1118,12 +1139,33 @@ export class DashboardComponent implements OnInit {
 
   private cargarResumen(): void {
     this.resumen = null;
+    this.errorCarga = '';
     this.dashboardService
       .obtenerResumen(this.fechaSeleccionadaIso)
-      .subscribe((resumen: DashboardResumen) => {
-        this.resumen = resumen;
-        this.paginaActual = 1;
+      .subscribe({
+        next: (resumen: DashboardResumen) => {
+          this.resumen = resumen;
+          this.paginaActual = 1;
+        },
+        error: () => {
+          this.errorCarga = 'No se pudo cargar el panel de control.';
+          this.abrirAlertaAviso(this.errorCarga);
+        },
       });
+  }
+
+  reintentarCarga(): void {
+    this.cargarResumen();
+  }
+
+  abrirAlertaAviso(mensaje: string): void {
+    this.alertaAvisoMensaje = mensaje;
+    this.alertAvisoAbierto = true;
+  }
+
+  cerrarAlertaAviso(): void {
+    this.alertAvisoAbierto = false;
+    this.alertaAvisoMensaje = '';
   }
 
   private parsearFechaIso(value: string): Date | null {

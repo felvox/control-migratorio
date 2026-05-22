@@ -10,6 +10,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { finalize, timeout } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { formatRunForInput } from '../../core/utils/run.util';
+import { ProgressivePasswordMaskDirective } from '../../shared/directives/progressive-password-mask.directive';
 
 const LOGIN_RUN_KEY = 'cm_login_run';
 const LOGIN_PASSWORD_KEY = 'cm_login_password';
@@ -17,7 +18,7 @@ const LOGIN_PASSWORD_KEY = 'cm_login_password';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ProgressivePasswordMaskDirective],
   template: `
     <div class="login-shell">
       <div class="login-overlay"></div>
@@ -52,6 +53,7 @@ const LOGIN_PASSWORD_KEY = 'cm_login_password';
                 <input
                   formControlName="password"
                   [type]="mostrarClave ? 'text' : 'password'"
+                  [appProgressivePasswordMask]="!mostrarClave"
                   placeholder="••••••••"
                   autocomplete="current-password"
                 />

@@ -9,7 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { EstadoCaso, InstitucionDerivacion } from '@prisma/client';
+import { EstadoCaso, InstitucionDerivacion, Jaf } from '@prisma/client';
 import { PersonaCasoDto } from './persona-caso.dto';
 import {
   TIPOS_CONTROL_PERMITIDOS,
@@ -17,6 +17,10 @@ import {
 } from '../../../common/constants/tipo-control.const';
 
 export class UpdateCasoDto {
+  @IsOptional()
+  @IsEnum(Jaf)
+  jaf?: Jaf;
+
   @IsOptional()
   @IsIn(TIPOS_CONTROL_PERMITIDOS)
   tipoControl?: TipoControlPermitido;

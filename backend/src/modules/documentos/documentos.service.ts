@@ -69,6 +69,14 @@ export class DocumentosService {
       throw new ForbiddenException('No tiene permisos para este caso');
     }
 
+    if (
+      user.role === Role.ADMINISTRADOR &&
+      !user.esMaster &&
+      (!user.jaf || caso.jaf !== user.jaf)
+    ) {
+      throw new ForbiddenException('No tiene permisos para casos de otra JAF');
+    }
+
     return caso;
   }
 
@@ -168,7 +176,6 @@ export class DocumentosService {
       };
 
       doc.font('Times-Roman').fillColor(lineColor);
-      drawLine(left + 2, cursorY + 2, left + 2, cursorY + 24);
       doc
         .font('Times-Roman')
         .fontSize(12)
@@ -435,6 +442,9 @@ export class DocumentosService {
       const receptor = caso.existenMenores
         ? 'FUNCIONARIO QUE RECIBE/ENTREGA DE CARABINEROS'
         : 'FUNCIONARIO QUE RECIBE/ENTREGA DE PDI';
+      const funcionarioEntrega = this.separarGradoYNombreFuncionario(
+        caso.creadoPor?.nombreCompleto,
+      );
       const leftSignX = left;
       const rightSignX = left + firmaBlockWidth;
       const firmaHeaderHeight = 24;
@@ -486,7 +496,15 @@ export class DocumentosService {
       };
 
       firmaRows.forEach((_, rowIndex) => {
-        drawFirmaRow(leftSignX, rowIndex, rowIndex === 1 ? caso.creadoPor.nombreCompleto : '');
+        let valorColumnaIzquierda = '';
+        if (rowIndex === 1) {
+          valorColumnaIzquierda =
+            funcionarioEntrega.nombre || valor(caso.creadoPor?.nombreCompleto);
+        } else if (rowIndex === 2) {
+          valorColumnaIzquierda = funcionarioEntrega.grado;
+        }
+
+        drawFirmaRow(leftSignX, rowIndex, valorColumnaIzquierda);
         drawFirmaRow(rightSignX, rowIndex);
       });
 
@@ -858,6 +876,50 @@ export class DocumentosService {
     return observaciones.slice(0, markerIndex).trim();
   }
 
+  private separarGradoYNombreFuncionario(
+    nombreCompleto: string | null | undefined,
+  ): { grado: string; nombre: string } {
+    const limpio = (nombreCompleto ?? '').trim().replace(/\s+/g, ' ');
+    if (!limpio) {
+      return { grado: '', nombre: '' };
+    }
+
+    const gradosCompuestos = [
+      'General de Ejército',
+      'General de División',
+      'General de Brigada',
+      'Teniente Coronel',
+      'Sub Oficial Mayor',
+      'Sub Oficial',
+      'Sargento Primero',
+      'Sargento Segundo',
+      'Cabo Primero',
+      'Cabo Segundo',
+    ];
+
+    const limpioLower = limpio.toLowerCase();
+    const gradoCompuesto = gradosCompuestos.find((grado) =>
+      limpioLower.startsWith(grado.toLowerCase()),
+    );
+
+    if (gradoCompuesto) {
+      return {
+        grado: gradoCompuesto,
+        nombre: limpio.slice(gradoCompuesto.length).trim(),
+      };
+    }
+
+    const partes = limpio.split(' ');
+    if (partes.length === 1) {
+      return { grado: partes[0] ?? '', nombre: '' };
+    }
+
+    return {
+      grado: partes[0] ?? '',
+      nombre: partes.slice(1).join(' ').trim(),
+    };
+  }
+
   async generarActaPdf(
     casoId: string,
     user: AuthUser,
@@ -935,6 +997,7 @@ export class DocumentosService {
             id: true,
             codigo: true,
             creadoPorId: true,
+            jaf: true,
           },
         },
       },
@@ -946,6 +1009,14 @@ export class DocumentosService {
 
     if (user.role === Role.OPERADOR && documento.caso.creadoPorId !== user.id) {
       throw new ForbiddenException('No tiene permisos para este documento');
+    }
+
+    if (
+      user.role === Role.ADMINISTRADOR &&
+      !user.esMaster &&
+      (!user.jaf || documento.caso.jaf !== user.jaf)
+    ) {
+      throw new ForbiddenException('No tiene permisos para documentos de otra JAF');
     }
 
     const rutaAbsoluta = join(this.storageRoot, documento.rutaArchivo);

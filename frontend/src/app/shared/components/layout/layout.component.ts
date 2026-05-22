@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { HttpErrorResponse } from '@angular/common/http';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   ActivatedRoute,
   NavigationEnd,
@@ -10,9 +12,12 @@ import {
   RouterOutlet,
 } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
-import { Rol } from '../../../core/models/auth.model';
+import { Jaf, MasterCandidate, Rol } from '../../../core/models/auth.model';
+import { AlertModalComponent } from '../alert-modal.component';
+import { ProgressivePasswordMaskDirective } from '../../directives/progressive-password-mask.directive';
 
 type IconoMenu = 'dashboard' | 'casos' | 'usuarios' | 'reportes' | 'consulta';
+type VistaModalCuenta = 'OPCIONES' | 'PASSWORD' | 'TRANSFER';
 
 interface MenuItem {
   label: string;
@@ -22,22 +27,33 @@ interface MenuItem {
   exact?: boolean;
   dividerBefore?: boolean;
   disabled?: boolean;
+  masterOnly?: boolean;
 }
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    AlertModalComponent,
+    ProgressivePasswordMaskDirective,
+  ],
   template: `
     <div class="layout-shell" [class.sidebar-collapsed]="sidebarOculta">
       <aside class="sidebar">
         <div class="sidebar-top" [class.sidebar-top-collapsed]="sidebarOculta">
-          <div class="brand-mark">
-            <img src="/assets/logo-corneta.png" alt="Logo institucional" />
+          <div class="brand-mark" [class.brand-mark-jaf]="esLogoJaf">
+            <img [src]="logoSidebarUrl" alt="Logo institucional" />
           </div>
 
           <div class="brand-text" *ngIf="!sidebarOculta">
             <h1>Control Migratorio</h1>
+            <p *ngIf="subtituloSidebar">{{ subtituloSidebar }}</p>
           </div>
         </div>
 
@@ -129,14 +145,236 @@ interface MenuItem {
             </label>
           </div>
           <div class="topbar-user">
-            <strong>{{ authService.currentUser?.nombreCompleto }}</strong>
-            <span class="badge">{{ authService.currentUser?.rol }}</span>
+            <button
+              type="button"
+              class="btn-profile"
+              (click)="abrirModalCambioPassword()"
+              [disabled]="!authService.currentUser"
+              title="Cambiar contraseña"
+            >
+              <span class="profile-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="8" r="4"></circle>
+                  <path d="M4 20c0-4 3.2-7 8-7s8 3 8 7"></path>
+                </svg>
+              </span>
+              <strong>{{ authService.currentUser?.nombreCompleto }}</strong>
+            </button>
+            <button
+              type="button"
+              class="badge badge-role"
+              (click)="abrirModalCambioPassword()"
+              [disabled]="!authService.currentUser"
+              title="Cambiar contraseña"
+            >
+              {{ authService.currentUser?.rol }}
+            </button>
           </div>
         </header>
 
         <section class="content-body">
           <router-outlet></router-outlet>
         </section>
+
+        <div class="modal-backdrop" *ngIf="modalCambioPasswordAbierto">
+          <section class="modal-card" role="dialog" aria-modal="true" aria-label="Cambiar contraseña">
+            <p class="modal-text" *ngIf="authService.currentUser as user">
+              Usuario: <strong>{{ user.nombreCompleto }}</strong>
+              ({{ user.run }})
+            </p>
+
+            <ng-container *ngIf="authService.currentUser as user">
+              <h3 *ngIf="vistaModalCuenta === 'OPCIONES'">Opciones de cuenta</h3>
+              <h3 *ngIf="vistaModalCuenta === 'PASSWORD'">Cambiar contraseña</h3>
+              <h3 *ngIf="vistaModalCuenta === 'TRANSFER'">Traspasar cuenta Administrador Master</h3>
+
+              <section class="account-options" *ngIf="user.esMaster && vistaModalCuenta === 'OPCIONES'">
+                <button type="button" class="account-option-card" (click)="abrirVistaCambioPassword()">
+                  <strong>Cambiar contraseña</strong>
+                  <span>Actualiza tu contraseña actual de acceso.</span>
+                </button>
+                <button type="button" class="account-option-card danger" (click)="abrirVistaTransferMaster()">
+                  <strong>Traspasar cuenta Master</strong>
+                  <span>Transfiere el control master a otro usuario activo.</span>
+                </button>
+              </section>
+
+              <form
+                *ngIf="vistaModalCuenta === 'PASSWORD'"
+                [formGroup]="formCambioPassword"
+                (ngSubmit)="confirmarCambioPassword()"
+                class="page-grid"
+              >
+                <div>
+                  <label>Contraseña actual</label>
+                  <div class="password-field">
+                    <input
+                      formControlName="passwordActual"
+                      [type]="mostrarPasswordActual ? 'text' : 'password'"
+                      [appProgressivePasswordMask]="!mostrarPasswordActual"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      (click)="mostrarPasswordActual = !mostrarPasswordActual"
+                    >
+                      {{ mostrarPasswordActual ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label>Nueva contraseña</label>
+                  <div class="password-field">
+                    <input
+                      formControlName="nuevaPassword"
+                      [type]="mostrarPasswordNueva ? 'text' : 'password'"
+                      [appProgressivePasswordMask]="!mostrarPasswordNueva"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      (click)="mostrarPasswordNueva = !mostrarPasswordNueva"
+                    >
+                      {{ mostrarPasswordNueva ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
+                  <p
+                    class="error-text"
+                    *ngIf="formCambioPassword.get('nuevaPassword')?.invalid && formCambioPassword.get('nuevaPassword')?.touched"
+                  >
+                    Debe tener 10+ caracteres, mayúscula, minúscula, número y símbolo.
+                  </p>
+                </div>
+
+                <div>
+                  <label>Confirmar nueva contraseña</label>
+                  <div class="password-field">
+                    <input
+                      formControlName="confirmarPassword"
+                      [type]="mostrarPasswordConfirmar ? 'text' : 'password'"
+                      [appProgressivePasswordMask]="!mostrarPasswordConfirmar"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      (click)="mostrarPasswordConfirmar = !mostrarPasswordConfirmar"
+                    >
+                      {{ mostrarPasswordConfirmar ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
+                  <p
+                    class="error-text"
+                    *ngIf="passwordsNoCoinciden && formCambioPassword.get('confirmarPassword')?.touched"
+                  >
+                    La confirmación no coincide con la nueva contraseña.
+                  </p>
+                </div>
+
+                <div class="modal-actions">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingCambioPassword"
+                    (click)="cerrarModalCambioPassword()"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    *ngIf="user.esMaster"
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingCambioPassword"
+                    (click)="volverOpcionesCuenta()"
+                  >
+                    Volver
+                  </button>
+                  <button class="btn-primary" [disabled]="loadingCambioPassword">
+                    {{ loadingCambioPassword ? 'Actualizando...' : 'Actualizar contraseña' }}
+                  </button>
+                </div>
+              </form>
+
+              <section class="master-transfer" *ngIf="user.esMaster && vistaModalCuenta === 'TRANSFER'">
+                <p>
+                  Selecciona al usuario que recibirá la cuenta master. Esta acción te quitará el estado master a ti.
+                </p>
+
+                <form [formGroup]="formCambioPassword" class="page-grid">
+                  <div>
+                    <label>Contraseña actual</label>
+                    <div class="password-field">
+                      <input
+                        formControlName="passwordActual"
+                        [type]="mostrarPasswordActual ? 'text' : 'password'"
+                        [appProgressivePasswordMask]="!mostrarPasswordActual"
+                      />
+                      <button
+                        type="button"
+                        class="password-toggle"
+                        (click)="mostrarPasswordActual = !mostrarPasswordActual"
+                      >
+                        {{ mostrarPasswordActual ? 'Ocultar' : 'Mostrar' }}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                <div>
+                  <label>Usuario destino</label>
+                  <select [(ngModel)]="targetMasterUserId" [ngModelOptions]="{ standalone: true }">
+                    <option value="">Seleccionar usuario</option>
+                    <option *ngFor="let candidato of masterCandidates" [value]="candidato.id">
+                      {{ candidato.nombreCompleto }} ({{ candidato.rol }}) - {{ candidato.run }}
+                    </option>
+                  </select>
+                  <p class="modal-text" *ngIf="!masterCandidates.length">
+                    No hay usuarios activos disponibles para recibir la cuenta master.
+                  </p>
+                </div>
+
+                <div class="modal-actions">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingTransferMaster"
+                    (click)="volverOpcionesCuenta()"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingTransferMaster"
+                    (click)="cerrarModalCambioPassword()"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-danger-outline"
+                    [disabled]="loadingTransferMaster || !masterCandidates.length"
+                    (click)="confirmarTransferMaster()"
+                  >
+                    {{ loadingTransferMaster ? 'Traspasando...' : 'Traspasar Master' }}
+                  </button>
+                </div>
+              </section>
+
+              <div class="modal-actions" *ngIf="user.esMaster && vistaModalCuenta === 'OPCIONES'">
+                <button type="button" class="btn-secondary" (click)="cerrarModalCambioPassword()">Cerrar</button>
+              </div>
+            </ng-container>
+          </section>
+        </div>
+
+        <app-alert-modal
+          [open]="alertPerfilAbierto"
+          [title]="alertPerfilTitulo"
+          [message]="alertPerfilMensaje"
+          [variant]="alertPerfilTipo"
+          (accepted)="cerrarAlertaPerfil()"
+        />
       </main>
     </div>
   `,
@@ -184,22 +422,26 @@ interface MenuItem {
       }
 
       .brand-mark {
-        width: 42px;
-        height: 42px;
-        border-radius: 0;
+        width: 46px;
+        height: 46px;
+        border-radius: 999px;
         overflow: hidden;
-        background: transparent;
-        border: 0;
+        background: #0f121a;
+        border: 1px solid #2b3444;
         display: grid;
         place-items: center;
         flex: none;
-        transform: translateY(-1px);
       }
 
       .brand-mark img {
-        width: 34px;
-        height: 34px;
-        object-fit: contain;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 999px;
+      }
+
+      .brand-mark.brand-mark-jaf img {
+        transform: scale(1.06);
       }
 
       .brand-text h1 {
@@ -209,6 +451,15 @@ interface MenuItem {
         color: #ffffff;
         letter-spacing: 0;
         font-weight: 650;
+      }
+
+      .brand-text p {
+        margin: 0.08rem 0 0;
+        font-size: 0.73rem;
+        line-height: 1.2;
+        color: #a5b3c5;
+        font-weight: 600;
+        letter-spacing: 0.02em;
       }
 
       .btn-sidebar-edge {
@@ -451,6 +702,7 @@ interface MenuItem {
         align-items: center;
         gap: 0.55rem;
         margin-left: auto;
+        min-width: 0;
       }
 
       .topbar.topbar-dashboard .topbar-user {
@@ -458,10 +710,191 @@ interface MenuItem {
         margin-left: 0;
       }
 
+      .btn-profile {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border: 1px solid #d5deea;
+        background: #ffffff;
+        color: #1f3146;
+        border-radius: 999px;
+        padding: 0.28rem 0.55rem;
+        max-width: 100%;
+      }
+
+      .btn-profile strong {
+        font-size: 1.01rem;
+        font-weight: 700;
+        color: #1f2f3f;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .btn-profile:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .profile-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid #c8d3e2;
+        background: #f4f8fc;
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+
+      .profile-icon svg {
+        width: 15px;
+        height: 15px;
+        stroke: #35516f;
+        stroke-width: 1.9;
+        fill: none;
+      }
+
+      .badge-role {
+        font-weight: 700;
+        color: #2f3f50;
+        background: #f8fbff;
+        border-color: #c8d3e2;
+      }
+
+      .badge-role:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+
       .content-body {
         display: grid;
         align-content: start;
         gap: 0.75rem;
+      }
+
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 21, 34, 0.5);
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        z-index: 1250;
+      }
+
+      .modal-card {
+        width: min(560px, 100%);
+        background: #ffffff;
+        border: 1px solid #d7e0ea;
+        border-radius: 12px;
+        box-shadow: 0 18px 48px rgba(10, 29, 54, 0.24);
+        padding: 1rem;
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .modal-card h3 {
+        margin: 0;
+        color: #1f3146;
+      }
+
+      .modal-text {
+        margin: 0;
+        color: #4c6178;
+      }
+
+      .account-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.65rem;
+      }
+
+      .account-option-card {
+        border: 1px solid #cfdbea;
+        background: #f7fbff;
+        border-radius: 12px;
+        padding: 0.75rem;
+        text-align: left;
+        display: grid;
+        gap: 0.25rem;
+        color: #204061;
+      }
+
+      .account-option-card strong {
+        font-size: 1rem;
+      }
+
+      .account-option-card span {
+        color: #5a7088;
+        font-size: 0.9rem;
+      }
+
+      .account-option-card:hover {
+        border-color: #7aa8db;
+        background: #eef6ff;
+      }
+
+      .account-option-card.danger {
+        background: #fff7f7;
+        color: #8f2727;
+        border-color: #efc0c0;
+      }
+
+      .account-option-card.danger span {
+        color: #9f4a4a;
+      }
+
+      .password-field {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.4rem;
+      }
+
+      .password-toggle {
+        border: 1px solid #c7d2df;
+        background: #f8fbff;
+        color: #2f445d;
+        border-radius: 8px;
+        padding: 0.5rem 0.72rem;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 0.35rem;
+      }
+
+      .error-text {
+        margin: 0.35rem 0 0;
+        font-size: 0.84rem;
+        color: #a12929;
+      }
+
+      .master-transfer {
+        margin-top: 0.35rem;
+        border-top: 1px solid #dce5ef;
+        padding-top: 0.85rem;
+        display: grid;
+        gap: 0.55rem;
+      }
+
+      .master-transfer h4 {
+        margin: 0;
+        color: #1f3146;
+      }
+
+      .master-transfer p {
+        margin: 0;
+        color: #5d6f83;
+        font-size: 0.9rem;
+      }
+
+      .btn-danger-outline {
+        border: 1px solid #e8b0b0;
+        background: #fff5f5;
+        color: #a12929;
       }
 
       @media (max-width: 980px) {
@@ -499,6 +932,19 @@ interface MenuItem {
         .topbar.topbar-dashboard .topbar-user {
           justify-self: start;
         }
+
+        .topbar-user {
+          flex-wrap: wrap;
+          width: 100%;
+        }
+
+        .btn-profile {
+          max-width: 100%;
+        }
+
+        .account-options {
+          grid-template-columns: 1fr;
+        }
       }
     `,
   ],
@@ -508,12 +954,40 @@ export class LayoutComponent implements OnInit {
   private readonly activatedRoute = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly formBuilder = inject(FormBuilder);
 
   sidebarOculta = false;
   menuItemsVisibles: MenuItem[] = [];
   tituloPaginaActual = 'Sistema Web de Control Migratorio';
   esDashboardActivo = false;
   fechaDashboardIso = this.formatearFechaIso(new Date());
+  modalCambioPasswordAbierto = false;
+  vistaModalCuenta: VistaModalCuenta = 'PASSWORD';
+  loadingCambioPassword = false;
+  loadingTransferMaster = false;
+  mostrarPasswordActual = false;
+  mostrarPasswordNueva = false;
+  mostrarPasswordConfirmar = false;
+  targetMasterUserId = '';
+  masterCandidates: MasterCandidate[] = [];
+  alertPerfilAbierto = false;
+  alertPerfilTitulo = 'Notificación';
+  alertPerfilMensaje = '';
+  alertPerfilTipo: 'success' | 'warning' = 'success';
+  private readonly passwordPattern =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/;
+
+  readonly formCambioPassword = this.formBuilder.group({
+    passwordActual: ['', [Validators.required]],
+    nuevaPassword: ['', [Validators.required, Validators.pattern(this.passwordPattern)]],
+    confirmarPassword: ['', [Validators.required]],
+  });
+  private readonly logoAdminAuditor = '/assets/logo-ejercito-chile.png';
+  private readonly logosPorJaf: Record<Jaf, string> = {
+    TARAPACA: '/assets/JAF_TAPARACA.png',
+    ANTOFAGASTA: '/assets/JAF_ANTOFAGASTA.png',
+    ARICA_PARINACOTA: '/assets/JAF_ARICA_PARINACOTA.png',
+  };
 
   private readonly menuItems: MenuItem[] = [
     {
@@ -538,11 +1012,18 @@ export class LayoutComponent implements OnInit {
       exact: true,
     },
     {
-      label: 'Usuarios',
+      label: 'Gestión de Usuarios',
       path: '/usuarios',
       roles: ['ADMINISTRADOR'],
       icon: 'usuarios',
       dividerBefore: true,
+    },
+    {
+      label: 'Trazabilidad',
+      path: '/auditoria',
+      roles: ['ADMINISTRADOR'],
+      icon: 'reportes',
+      masterOnly: true,
     },
     {
       label: 'Reportes',
@@ -559,6 +1040,42 @@ export class LayoutComponent implements OnInit {
       exact: true,
     },
   ];
+
+  get logoSidebarUrl(): string {
+    const rol = this.authService.currentUser?.rol;
+    if (rol === 'ADMINISTRADOR' || rol === 'AUDITOR') {
+      return this.logoAdminAuditor;
+    }
+
+    const jaf = this.authService.currentUser?.jaf;
+    if (!jaf) {
+      return '/assets/logo-corneta.png';
+    }
+
+    return this.logosPorJaf[jaf] ?? '/assets/logo-corneta.png';
+  }
+
+  get esLogoJaf(): boolean {
+    const rol = this.authService.currentUser?.rol;
+    return rol !== 'ADMINISTRADOR' && rol !== 'AUDITOR';
+  }
+
+  get subtituloSidebar(): string {
+    const rol = this.authService.currentUser?.rol;
+    const jaf = this.authService.currentUser?.jaf;
+
+    if ((rol === 'ADMINISTRADOR' || rol === 'AUDITOR') && !jaf) {
+      return 'ADMINISTRACIÓN NACIONAL';
+    }
+
+    return this.etiquetaJaf(jaf);
+  }
+
+  get passwordsNoCoinciden(): boolean {
+    const nueva = this.formCambioPassword.get('nuevaPassword')?.value ?? '';
+    const confirmar = this.formCambioPassword.get('confirmarPassword')?.value ?? '';
+    return Boolean(nueva && confirmar && nueva !== confirmar);
+  }
 
   ngOnInit(): void {
     this.actualizarMenuItemsVisibles();
@@ -590,6 +1107,177 @@ export class LayoutComponent implements OnInit {
     event.stopPropagation();
   }
 
+  abrirModalCambioPassword(): void {
+    if (!this.authService.currentUser) {
+      return;
+    }
+
+    this.modalCambioPasswordAbierto = true;
+    this.loadingCambioPassword = false;
+    this.mostrarPasswordActual = false;
+    this.mostrarPasswordNueva = false;
+    this.mostrarPasswordConfirmar = false;
+    this.formCambioPassword.reset({
+      passwordActual: '',
+      nuevaPassword: '',
+      confirmarPassword: '',
+    });
+    this.targetMasterUserId = '';
+    this.masterCandidates = [];
+    this.loadingTransferMaster = false;
+    this.vistaModalCuenta = this.authService.currentUser.esMaster
+      ? 'OPCIONES'
+      : 'PASSWORD';
+
+    if (this.authService.currentUser.esMaster) {
+      this.cargarMasterCandidates();
+    }
+  }
+
+  cerrarModalCambioPassword(): void {
+    if (this.loadingCambioPassword) {
+      return;
+    }
+
+    this.modalCambioPasswordAbierto = false;
+    this.targetMasterUserId = '';
+    this.masterCandidates = [];
+    this.loadingTransferMaster = false;
+    this.vistaModalCuenta = 'PASSWORD';
+  }
+
+  cerrarAlertaPerfil(): void {
+    this.alertPerfilAbierto = false;
+  }
+
+  confirmarCambioPassword(): void {
+    if (this.loadingCambioPassword) {
+      return;
+    }
+
+    this.formCambioPassword.markAllAsTouched();
+    if (this.formCambioPassword.invalid) {
+      this.abrirAlertaPerfil(
+        'Revisa la información',
+        'Completa todos los campos y valida la nueva contraseña.',
+        'warning',
+      );
+      return;
+    }
+
+    if (this.passwordsNoCoinciden) {
+      this.abrirAlertaPerfil(
+        'Revisa la información',
+        'La confirmación no coincide con la nueva contraseña.',
+        'warning',
+      );
+      return;
+    }
+
+    const passwordActual = this.formCambioPassword.get('passwordActual')?.value ?? '';
+    const nuevaPassword = this.formCambioPassword.get('nuevaPassword')?.value ?? '';
+
+    this.loadingCambioPassword = true;
+    this.authService
+      .changePassword({ passwordActual, nuevaPassword })
+      .subscribe({
+        next: () => {
+          this.loadingCambioPassword = false;
+          this.modalCambioPasswordAbierto = false;
+          this.abrirAlertaPerfil(
+            'Contraseña actualizada',
+            'Tu nueva contraseña fue guardada correctamente.',
+            'success',
+          );
+        },
+        error: (error: HttpErrorResponse) => {
+          this.loadingCambioPassword = false;
+          const backendMessage =
+            typeof error.error?.message === 'string'
+              ? error.error.message
+              : 'No fue posible actualizar la contraseña. Intenta nuevamente.';
+          this.abrirAlertaPerfil('Acción no completada', backendMessage, 'warning');
+        },
+      });
+  }
+
+  confirmarTransferMaster(): void {
+    if (this.loadingTransferMaster || this.loadingCambioPassword) {
+      return;
+    }
+
+    const passwordActual = this.formCambioPassword.get('passwordActual')?.value ?? '';
+    if (!passwordActual) {
+      this.abrirAlertaPerfil(
+        'Revisa la información',
+        'Ingresa tu contraseña actual para traspasar la cuenta master.',
+        'warning',
+      );
+      return;
+    }
+
+    if (!this.targetMasterUserId) {
+      this.abrirAlertaPerfil(
+        'Revisa la información',
+        'Selecciona un usuario destino para traspasar la cuenta master.',
+        'warning',
+      );
+      return;
+    }
+
+    this.loadingTransferMaster = true;
+    this.authService
+      .transferMaster({
+        passwordActual,
+        targetUserId: this.targetMasterUserId,
+      })
+      .subscribe({
+        next: (response) => {
+          this.loadingTransferMaster = false;
+          this.modalCambioPasswordAbierto = false;
+          this.targetMasterUserId = '';
+          this.masterCandidates = [];
+          this.abrirAlertaPerfil(
+            'Traspaso completado',
+            `${response.message || 'La cuenta master fue transferida correctamente.'} Se cerrará tu sesión automáticamente.`,
+            'success',
+          );
+          setTimeout(() => {
+            this.authService.logout().subscribe(() => {
+              this.router.navigate(['/login']);
+            });
+          }, 900);
+        },
+        error: (error: HttpErrorResponse) => {
+          this.loadingTransferMaster = false;
+          const backendMessage =
+            typeof error.error?.message === 'string'
+              ? error.error.message
+              : 'No fue posible traspasar la cuenta master. Intenta nuevamente.';
+          this.abrirAlertaPerfil('Acción no completada', backendMessage, 'warning');
+        },
+      });
+  }
+
+  abrirVistaCambioPassword(): void {
+    this.vistaModalCuenta = 'PASSWORD';
+  }
+
+  abrirVistaTransferMaster(): void {
+    this.vistaModalCuenta = 'TRANSFER';
+    if (!this.masterCandidates.length) {
+      this.cargarMasterCandidates();
+    }
+  }
+
+  volverOpcionesCuenta(): void {
+    if (this.authService.currentUser?.esMaster) {
+      this.vistaModalCuenta = 'OPCIONES';
+      return;
+    }
+    this.vistaModalCuenta = 'PASSWORD';
+  }
+
   private actualizarMenuItemsVisibles(): void {
     const rolActual = this.authService.currentUser?.rol;
 
@@ -606,6 +1294,7 @@ export class LayoutComponent implements OnInit {
         '/casos/nuevo',
         '/casos',
         '/usuarios',
+        '/auditoria',
         '/reportes',
       ]);
     } else if (rolActual === 'OPERADOR') {
@@ -649,13 +1338,57 @@ export class LayoutComponent implements OnInit {
     return paths
       .map((path) => this.menuItems.find((item) => item.path === path))
       .filter((item): item is MenuItem => Boolean(item))
-      .filter((item) => this.authService.hasRole(item.roles));
+      .filter((item) => this.authService.hasRole(item.roles))
+      .filter((item) => !item.masterOnly || Boolean(this.authService.currentUser?.esMaster));
+  }
+
+  private cargarMasterCandidates(): void {
+    this.authService.listMasterCandidates().subscribe({
+      next: (items) => {
+        this.masterCandidates = items ?? [];
+      },
+      error: (error: HttpErrorResponse) => {
+        this.masterCandidates = [];
+        const backendMessage =
+          typeof error.error?.message === 'string'
+            ? error.error.message
+            : 'No fue posible cargar los usuarios para traspaso master.';
+        this.abrirAlertaPerfil('Acción no completada', backendMessage, 'warning');
+      },
+    });
+  }
+
+  private etiquetaJaf(jaf: Jaf | null | undefined): string {
+    if (jaf === 'TARAPACA') {
+      return 'JAF TARAPACÁ';
+    }
+
+    if (jaf === 'ANTOFAGASTA') {
+      return 'JAF ANTOFAGASTA';
+    }
+
+    if (jaf === 'ARICA_PARINACOTA') {
+      return 'JAF ARICA Y PARINACOTA';
+    }
+
+    return '';
   }
 
   logout(): void {
     this.authService.logout().subscribe(() => {
       this.router.navigate(['/login']);
     });
+  }
+
+  private abrirAlertaPerfil(
+    titulo: string,
+    mensaje: string,
+    tipo: 'success' | 'warning',
+  ): void {
+    this.alertPerfilTitulo = titulo;
+    this.alertPerfilMensaje = mensaje;
+    this.alertPerfilTipo = tipo;
+    this.alertPerfilAbierto = true;
   }
 
   onDashboardFechaChange(event: Event): void {

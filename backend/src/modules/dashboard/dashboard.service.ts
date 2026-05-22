@@ -1,13 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import {
   EstadoCaso,
   InstitucionDerivacion,
   Prisma,
+  Role,
   TipoControl,
   TipoPersona,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { AuthUser } from '../../common/interfaces/auth-user.interface';
 
 @Injectable()
 export class DashboardService {
@@ -62,8 +64,24 @@ export class DashboardService {
     return `${year}-${month}-${day}`;
   }
 
-  async resumenAdministrador(fecha?: string) {
+  private resolverFiltroJaf(user: AuthUser): Prisma.CasoWhereInput {
+    const esAdminOperativo = user.role === Role.ADMINISTRADOR && !user.esMaster;
+    if (!esAdminOperativo) {
+      return {};
+    }
+
+    if (!user.jaf) {
+      throw new ForbiddenException(
+        'Administrador operativo sin JAF asignada. Contacte al Administrador Master.',
+      );
+    }
+
+    return { jaf: user.jaf };
+  }
+
+  async resumenAdministrador(user: AuthUser, fecha?: string) {
     const fechaBase = this.resolverFechaBase(fecha);
+    const filtroJaf = this.resolverFiltroJaf(user);
     const inicioDia = this.inicioDia(fechaBase);
     const finDia = this.finDia(fechaBase);
 
@@ -86,6 +104,7 @@ export class DashboardService {
     inicioTendencia.setDate(inicioTendencia.getDate() - 6);
 
     const whereHastaFecha: Prisma.CasoWhereInput = {
+      ...filtroJaf,
       eliminadoAt: null,
       fechaHoraProcedimiento: {
         lte: finDia,
@@ -93,6 +112,7 @@ export class DashboardService {
     };
 
     const whereDia: Prisma.CasoWhereInput = {
+      ...filtroJaf,
       eliminadoAt: null,
       fechaHoraProcedimiento: {
         gte: inicioDia,
@@ -101,6 +121,7 @@ export class DashboardService {
     };
 
     const whereSemana: Prisma.CasoWhereInput = {
+      ...filtroJaf,
       eliminadoAt: null,
       fechaHoraProcedimiento: {
         gte: inicioSemana,
@@ -109,6 +130,7 @@ export class DashboardService {
     };
 
     const whereMes: Prisma.CasoWhereInput = {
+      ...filtroJaf,
       eliminadoAt: null,
       fechaHoraProcedimiento: {
         gte: inicioMes,
@@ -132,7 +154,6 @@ export class DashboardService {
       estadoPorDocumentado,
       topUbicaciones,
       totalCasosConLesiones,
-      totalCasosPendientesFirma,
       totalCasosCerrados,
       totalCasosSinCierre,
       totalCasosConMenorPendiente,
@@ -199,6 +220,7 @@ export class DashboardService {
         }),
         this.prisma.caso.findMany({
           where: {
+            ...filtroJaf,
             eliminadoAt: null,
             fechaHoraProcedimiento: {
               gte: inicioTendencia,
@@ -308,12 +330,6 @@ export class DashboardService {
                 },
               },
             ],
-          },
-        }),
-        this.prisma.caso.count({
-          where: {
-            ...whereHastaFecha,
-            estado: EstadoCaso.PENDIENTE,
           },
         }),
         this.prisma.caso.count({
@@ -506,13 +522,11 @@ export class DashboardService {
         menoresEdad: totalPersonasMenores,
         noDocumentados: documentadoNo,
         conLesiones: totalCasosConLesiones,
-        pendientesFirma: totalCasosPendientesFirma,
         casosCerrados: totalCasosCerrados,
       },
       alertas: {
         menoresPendientes: totalCasosConMenorPendiente,
         lesionesRevision: totalCasosConLesiones,
-        actasSinFirma: totalCasosPendientesFirma,
         sinCierreOperativo: totalCasosSinCierre,
       },
       actividadReciente,

@@ -15,5 +15,6 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "skipLibCheck": true
-  }
+  },
+  "exclude": ["node_modules", "test", "dist", "**/*.spec.ts"]
 }

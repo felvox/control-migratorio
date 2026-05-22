@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Jaf, Role } from '@prisma/client';
 import {
   IsBoolean,
   IsEnum,
@@ -22,6 +22,10 @@ export class UpdateUsuarioDto {
   @IsOptional()
   @IsEnum(Role)
   rol?: Role;
+
+  @IsOptional()
+  @IsEnum(Jaf)
+  jaf?: Jaf;
 
   @IsOptional()
   @IsBoolean()

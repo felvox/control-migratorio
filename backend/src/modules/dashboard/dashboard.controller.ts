@@ -4,6 +4,8 @@ import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../common/interfaces/auth-user.interface';
 
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,7 +14,7 @@ export class DashboardController {
 
   @Get('resumen')
   @Roles(Role.ADMINISTRADOR)
-  obtenerResumen(@Query('fecha') fecha?: string) {
-    return this.dashboardService.resumenAdministrador(fecha);
+  obtenerResumen(@CurrentUser() user: AuthUser, @Query('fecha') fecha?: string) {
+    return this.dashboardService.resumenAdministrador(user, fecha);
   }
 }

@@ -9,6 +9,8 @@ interface JwtPayload {
   run: string;
   role: string;
   nombreCompleto: string;
+  esMaster?: boolean;
+  jaf?: string | null;
   sesionId?: string;
 }
 
@@ -43,11 +45,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         run: true,
         rol: true,
         nombreCompleto: true,
+        esMaster: true,
+        jaf: true,
       },
     });
 
     if (!user) {
       throw new UnauthorizedException('Token inválido');
+    }
+
+    if (
+      (['OPERADOR', 'CONSULTA'].includes(user.rol) ||
+        (user.rol === 'ADMINISTRADOR' && !user.esMaster)) &&
+      !user.jaf
+    ) {
+      throw new UnauthorizedException('Usuario sin JAF asignada');
     }
 
     const limiteSesionActiva = new Date(
@@ -86,6 +98,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       run: user.run,
       role: user.rol,
       nombreCompleto: user.nombreCompleto,
+      esMaster: user.esMaster,
+      jaf: user.jaf,
       sesionId: payload.sesionId,
     };
   }

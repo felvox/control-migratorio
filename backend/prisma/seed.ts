@@ -10,6 +10,7 @@ async function main() {
       email: null,
       nombreCompleto: 'Mayor Jaime Espinoza Fariña',
       rol: Role.ADMINISTRADOR,
+      esMaster: true,
       password: 'Admin123*',
       forcePasswordOnSeed: true,
     },
@@ -36,6 +37,7 @@ async function main() {
           email: user.email,
           nombreCompleto: user.nombreCompleto,
           rol: user.rol,
+          esMaster: user.esMaster,
           activo: true,
           passwordHash: user.forcePasswordOnSeed ? passwordHash : undefined,
         },
@@ -49,6 +51,7 @@ async function main() {
         email: user.email,
         nombreCompleto: user.nombreCompleto,
         rol: user.rol,
+        esMaster: user.esMaster,
         passwordHash,
       },
     });

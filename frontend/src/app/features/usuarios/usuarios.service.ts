@@ -8,6 +8,7 @@ export interface UsuarioListado {
   run: string;
   nombreCompleto: string;
   rol: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
+  jaf: 'TARAPACA' | 'ANTOFAGASTA' | 'ARICA_PARINACOTA' | null;
   activo: boolean;
   ultimoAcceso: string | null;
 }
@@ -16,6 +17,7 @@ export interface UsuarioActualizacion {
   run?: string;
   nombreCompleto?: string;
   rol?: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
+  jaf?: 'TARAPACA' | 'ANTOFAGASTA' | 'ARICA_PARINACOTA' | null;
   activo?: boolean;
 }
 
@@ -44,6 +46,7 @@ export class UsuariosService {
     nombre: string;
     apellidos: string;
     rol: 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
+    jaf?: 'TARAPACA' | 'ANTOFAGASTA' | 'ARICA_PARINACOTA';
     password: string;
   }) {
     return this.http.post<UsuarioListado>(`${this.apiUrl}/usuarios`, payload);

@@ -46,6 +46,7 @@ export class EvidenciasService {
         id: true,
         codigo: true,
         creadoPorId: true,
+        jaf: true,
       },
     });
 
@@ -55,6 +56,14 @@ export class EvidenciasService {
 
     if (user.role === Role.OPERADOR && caso.creadoPorId !== user.id) {
       throw new ForbiddenException('No tiene permisos para este caso');
+    }
+
+    if (
+      user.role === Role.ADMINISTRADOR &&
+      !user.esMaster &&
+      (!user.jaf || caso.jaf !== user.jaf)
+    ) {
+      throw new ForbiddenException('No tiene permisos para casos de otra JAF');
     }
 
     return caso;
@@ -230,6 +239,7 @@ export class EvidenciasService {
             id: true,
             codigo: true,
             creadoPorId: true,
+            jaf: true,
           },
         },
       },
@@ -241,6 +251,14 @@ export class EvidenciasService {
 
     if (user.role === Role.OPERADOR && evidencia.caso.creadoPorId !== user.id) {
       throw new ForbiddenException('No tiene permisos para esta evidencia');
+    }
+
+    if (
+      user.role === Role.ADMINISTRADOR &&
+      !user.esMaster &&
+      (!user.jaf || evidencia.caso.jaf !== user.jaf)
+    ) {
+      throw new ForbiddenException('No tiene permisos para evidencias de otra JAF');
     }
 
     const rutaAbsoluta = join(this.storageRoot, evidencia.rutaArchivo);

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryReporteCasosDto } from './dto/query-reporte-casos.dto';
@@ -14,9 +14,20 @@ export class ReportesService {
     private readonly auditoriaService: AuditoriaService,
   ) {}
 
-  private construirWhere(query: QueryReporteCasosDto): Prisma.CasoWhereInput {
+  private construirWhere(
+    query: QueryReporteCasosDto,
+    user: AuthUser,
+  ): Prisma.CasoWhereInput {
+    const esAdminOperativo = user.role === Role.ADMINISTRADOR && !user.esMaster;
+    if (esAdminOperativo && !user.jaf) {
+      throw new ForbiddenException(
+        'Administrador operativo sin JAF asignada. Contacte al Administrador Master.',
+      );
+    }
+
     return {
       eliminadoAt: null,
+      jaf: esAdminOperativo ? (user.jaf ?? undefined) : undefined,
       estado: query.estado,
       tipoControl: query.tipoControl,
       creadoPorId: query.operadorId,
@@ -46,8 +57,8 @@ export class ReportesService {
     };
   }
 
-  private async obtenerCasosFiltrados(query: QueryReporteCasosDto) {
-    const where = this.construirWhere(query);
+  private async obtenerCasosFiltrados(query: QueryReporteCasosDto, user: AuthUser) {
+    const where = this.construirWhere(query, user);
 
     return this.prisma.caso.findMany({
       where,
@@ -91,7 +102,7 @@ export class ReportesService {
     user: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    const casos = await this.obtenerCasosFiltrados(query);
+    const casos = await this.obtenerCasosFiltrados(query, user);
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Reporte Casos');
@@ -150,7 +161,7 @@ export class ReportesService {
     user: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
-    const casos = await this.obtenerCasosFiltrados(query);
+    const casos = await this.obtenerCasosFiltrados(query, user);
 
     const buffer = await new Promise<Buffer>((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', margin: 40 });

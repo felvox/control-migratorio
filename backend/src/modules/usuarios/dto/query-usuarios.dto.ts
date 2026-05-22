@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Jaf, Role } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -18,6 +18,10 @@ export class QueryUsuariosDto {
   @IsOptional()
   @IsEnum(Role)
   rol?: Role;
+
+  @IsOptional()
+  @IsEnum(Jaf)
+  jaf?: Jaf;
 
   @IsOptional()
   @Type(() => Boolean)

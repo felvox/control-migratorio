@@ -90,21 +90,80 @@ export class AuditoriaService {
     const limite = query.limite ?? 20;
     const skip = (pagina - 1) * limite;
 
-    const where = {
-      accion: query.accion
+    const acciones = (query.acciones ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const entidades = (query.entidades ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    const whereAnd: Prisma.AuditoriaWhereInput[] = [];
+
+    if (query.accion) {
+      whereAnd.push({
+        accion: {
+          contains: query.accion,
+          mode: 'insensitive',
+        },
+      });
+    }
+
+    if (query.entidad) {
+      whereAnd.push({
+        entidad: {
+          contains: query.entidad,
+          mode: 'insensitive',
+        },
+      });
+    }
+
+    if (acciones.length > 0) {
+      whereAnd.push({
+        accion: {
+          in: acciones,
+        },
+      });
+    }
+
+    if (entidades.length > 0) {
+      whereAnd.push({
+        entidad: {
+          in: entidades,
+        },
+      });
+    }
+
+    if (query.jaf) {
+      whereAnd.push({
+        OR: [
+          {
+            caso: {
+              jaf: query.jaf,
+            },
+          },
+          {
+            usuario: {
+              jaf: query.jaf,
+            },
+          },
+        ],
+      });
+    }
+
+    if (query.usuarioId) {
+      whereAnd.push({
+        usuarioId: query.usuarioId,
+      });
+    }
+
+    const where: Prisma.AuditoriaWhereInput =
+      whereAnd.length > 0
         ? {
-            contains: query.accion,
-            mode: 'insensitive' as const,
+            AND: whereAnd,
           }
-        : undefined,
-      entidad: query.entidad
-        ? {
-            contains: query.entidad,
-            mode: 'insensitive' as const,
-          }
-        : undefined,
-      usuarioId: query.usuarioId,
-    };
+        : {};
 
     const [total, items] = await Promise.all([
       this.prisma.auditoria.count({ where }),

@@ -1,4 +1,4 @@
-import { Rol } from './auth.model';
+import { Jaf, Rol } from './auth.model';
 
 export type TipoControl = 'INGRESO' | 'EGRESO';
 export type TipoPersona = 'PRINCIPAL' | 'ACOMPANANTE' | 'MENOR';
@@ -32,6 +32,7 @@ export interface PersonaCaso {
 export interface Caso {
   id: string;
   codigo: string;
+  jaf: Jaf;
   tipoControl: TipoControl;
   fechaHoraProcedimiento: string;
   lugar: string;

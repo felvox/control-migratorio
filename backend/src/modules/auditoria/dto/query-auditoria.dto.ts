@@ -1,5 +1,6 @@
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Jaf } from '@prisma/client';
 
 export class QueryAuditoriaDto {
   @IsOptional()
@@ -9,6 +10,18 @@ export class QueryAuditoriaDto {
   @IsOptional()
   @IsString()
   entidad?: string;
+
+  @IsOptional()
+  @IsString()
+  acciones?: string;
+
+  @IsOptional()
+  @IsString()
+  entidades?: string;
+
+  @IsOptional()
+  @IsEnum(Jaf)
+  jaf?: Jaf;
 
   @IsOptional()
   @IsString()

@@ -14,6 +14,12 @@ export const roleGuard: CanActivateFn = (route) => {
   }
 
   const roles = (route.data?.['roles'] as Rol[] | undefined) ?? [];
+  const requiereMaster = Boolean(route.data?.['requiresMaster']);
+
+  if (requiereMaster && !authService.currentUser?.esMaster) {
+    router.navigate([authService.resolveHomeByRole()]);
+    return false;
+  }
 
   if (roles.length === 0 || authService.hasRole(roles)) {
     return true;

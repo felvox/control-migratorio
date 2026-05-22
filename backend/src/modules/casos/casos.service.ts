@@ -6,6 +6,7 @@ import {
 import {
   EstadoCaso,
   InstitucionDerivacion,
+  Jaf,
   Prisma,
   Role,
   TipoPersona,
@@ -20,10 +21,62 @@ import { AuditoriaService } from '../auditoria/auditoria.service';
 
 @Injectable()
 export class CasosService {
+  private readonly rolesConRestriccionJaf = new Set<Role>([
+    Role.OPERADOR,
+    Role.CONSULTA,
+  ]);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoriaService: AuditoriaService,
   ) {}
+
+  private tieneRestriccionPorJaf(user: AuthUser): boolean {
+    return (
+      this.rolesConRestriccionJaf.has(user.role) ||
+      (user.role === Role.ADMINISTRADOR && !user.esMaster)
+    );
+  }
+
+  private resolverJafParaCreacion(dtoJaf: Jaf | undefined, user: AuthUser): Jaf {
+    if (this.tieneRestriccionPorJaf(user)) {
+      if (!user.jaf) {
+        throw new ForbiddenException(
+          'Usuario sin JAF asignada. Contacte a un administrador.',
+        );
+      }
+
+      return user.jaf;
+    }
+
+    if (dtoJaf) {
+      return dtoJaf;
+    }
+
+    if (user.jaf) {
+      return user.jaf;
+    }
+
+    return Jaf.TARAPACA;
+  }
+
+  private resolverJafParaActualizacion(
+    dtoJaf: Jaf | undefined,
+    user: AuthUser,
+    jafActual: Jaf,
+  ): Jaf {
+    if (this.tieneRestriccionPorJaf(user)) {
+      if (!user.jaf) {
+        throw new ForbiddenException(
+          'Usuario sin JAF asignada. Contacte a un administrador.',
+        );
+      }
+
+      return user.jaf;
+    }
+
+    return dtoJaf ?? jafActual;
+  }
 
   private resolverFlujo(existenMenores: boolean) {
     if (existenMenores) {
@@ -57,9 +110,16 @@ export class CasosService {
     return `CM-${Date.now()}`;
   }
 
-  private validarAcceso(caso: { creadoPorId: string }, user: AuthUser) {
-    if (user.role === Role.OPERADOR && caso.creadoPorId !== user.id) {
-      throw new ForbiddenException('No tiene permisos para acceder a este caso');
+  private validarAcceso(
+    caso: { creadoPorId: string; jaf: Jaf },
+    user: AuthUser,
+  ) {
+    if (this.tieneRestriccionPorJaf(user)) {
+      if (!user.jaf || caso.jaf !== user.jaf) {
+        throw new ForbiddenException(
+          'No tiene permisos para acceder a casos de otra JAF',
+        );
+      }
     }
   }
 
@@ -77,12 +137,14 @@ export class CasosService {
 
     const vieneAcompanadoDetectado = dto.vieneAcompanado || dto.personas.length > 1;
     const flujo = this.resolverFlujo(existenMenoresDetectados);
+    const jafCaso = this.resolverJafParaCreacion(dto.jaf, user);
     const codigo = await this.generarCodigoCaso();
 
     const caso = await this.prisma.$transaction(async (tx) => {
       const creado = await tx.caso.create({
         data: {
           codigo,
+          jaf: jafCaso,
           tipoControl: dto.tipoControl,
           fechaHoraProcedimiento: new Date(dto.fechaHoraProcedimiento),
           lugar: dto.lugar,
@@ -142,16 +204,21 @@ export class CasosService {
     const limite = query.limite ?? 20;
     const skip = (pagina - 1) * limite;
 
+    if (this.tieneRestriccionPorJaf(user) && !user.jaf) {
+      throw new ForbiddenException(
+        'Usuario sin JAF asignada. Contacte a un administrador.',
+      );
+    }
+
     const where: Prisma.CasoWhereInput = {
       eliminadoAt: null,
       estado: query.estado,
       tipoControl: query.tipoControl,
-      creadoPorId:
-        user.role === Role.OPERADOR
-          ? user.id
-          : query.operadorId
-            ? query.operadorId
-            : undefined,
+      jaf:
+        this.tieneRestriccionPorJaf(user)
+          ? user.jaf ?? undefined
+          : query.jaf,
+      creadoPorId: query.operadorId ? query.operadorId : undefined,
       lugar: query.ubicacion
         ? {
             contains: query.ubicacion,
@@ -283,6 +350,7 @@ export class CasosService {
         id: true,
         codigo: true,
         creadoPorId: true,
+        jaf: true,
         existenMenores: true,
       },
     });
@@ -303,8 +371,10 @@ export class CasosService {
         : caso.existenMenores);
 
     const flujo = this.resolverFlujo(existenMenoresDetectados);
+    const jafCaso = this.resolverJafParaActualizacion(dto.jaf, user, caso.jaf);
 
     const dataBase: Prisma.CasoUpdateInput = {
+      jaf: jafCaso,
       tipoControl: dto.tipoControl,
       fechaHoraProcedimiento: dto.fechaHoraProcedimiento
         ? new Date(dto.fechaHoraProcedimiento)
@@ -381,6 +451,7 @@ export class CasosService {
         id: true,
         codigo: true,
         creadoPorId: true,
+        jaf: true,
       },
     });
 

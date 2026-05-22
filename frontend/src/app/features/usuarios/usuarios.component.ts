@@ -1,17 +1,31 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { UsuarioListado, UsuariosService } from './usuarios.service';
-import { formatRunForDisplay, formatRunForInput } from '../../core/utils/run.util';
+import {
+  formatRunForDisplay,
+  formatRunForInput,
+  isRunChilenoValido,
+} from '../../core/utils/run.util';
 import { AlertModalComponent } from '../../shared/components/alert-modal.component';
+import { AuthService } from '../../core/services/auth.service';
+import { ProgressivePasswordMaskDirective } from '../../shared/directives/progressive-password-mask.directive';
 
 type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' | null;
+type Jaf = 'TARAPACA' | 'ANTOFAGASTA' | 'ARICA_PARINACOTA';
+type RolUsuario = 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, AlertModalComponent],
+  imports: [CommonModule, ReactiveFormsModule, AlertModalComponent, ProgressivePasswordMaskDirective],
   template: `
     <div class="page-grid usuarios-page">
       <article class="card acciones-card">
@@ -22,7 +36,7 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
           <button
             class="btn-secondary"
             type="button"
-            [disabled]="!usuarioSeleccionado"
+            [disabled]="!puedeResetearSeleccionado"
             (click)="abrirModal('RESET')"
           >
             Resetear clave
@@ -46,7 +60,7 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
           <button
             class="btn-danger"
             type="button"
-            [disabled]="!usuarioSeleccionado"
+            [disabled]="!puedeEliminarSeleccionado"
             (click)="abrirModal('ELIMINAR')"
           >
             Eliminar
@@ -72,6 +86,7 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
                 <th>Nombre</th>
                 <th>RUN</th>
                 <th>Rol</th>
+                <th>JAF</th>
                 <th>Estado</th>
                 <th>Último acceso</th>
               </tr>
@@ -92,6 +107,7 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
                 <td>{{ usuario.nombreCompleto }}</td>
                 <td>{{ formatRun(usuario.run) }}</td>
                 <td>{{ usuario.rol }}</td>
+                <td>{{ etiquetaJaf(usuario.jaf) }}</td>
                 <td>
                   <span class="badge" [class.success]="usuario.activo">
                     {{ usuario.activo ? 'Activo' : 'Inactivo' }}
@@ -107,7 +123,7 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
               </tr>
 
               <tr *ngIf="usuarios.length === 0">
-                <td colspan="6" class="empty-cell">No hay usuarios para mostrar.</td>
+                <td colspan="7" class="empty-cell">No hay usuarios para mostrar.</td>
               </tr>
             </tbody>
           </table>
@@ -116,8 +132,6 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
 
       <div class="modal-backdrop" *ngIf="modalAbierto">
         <section class="modal-card" [ngSwitch]="modalAbierto" role="dialog" aria-modal="true">
-          <p class="error-text modal-error" *ngIf="errorOperacion">{{ errorOperacion }}</p>
-
           <ng-container *ngSwitchCase="'CREAR'">
             <h3>Crear usuario</h3>
             <form [formGroup]="formCrear" (ngSubmit)="confirmarCrear()" class="page-grid">
@@ -149,26 +163,39 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
 
                 <div>
                   <label>Rol</label>
-                  <select formControlName="rol">
-                    <option value="ADMINISTRADOR">Administrador</option>
-                    <option value="OPERADOR">Operador</option>
-                    <option value="CONSULTA">Consulta</option>
-                    <option value="AUDITOR">Auditor</option>
+                  <select formControlName="rol" (change)="onRolCrearChange()">
+                    <option *ngFor="let rolOption of rolesDisponiblesCrear" [value]="rolOption.valor">
+                      {{ rolOption.etiqueta }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label>JAF</label>
+                  <select formControlName="jaf" [disabled]="!requiereJafCrear || !puedeEditarJafCrear">
+                    <option value="">Seleccionar JAF</option>
+                    <option *ngFor="let option of jafOptions" [value]="option.valor">
+                      {{ option.etiqueta }}
+                    </option>
                   </select>
                 </div>
 
                 <div>
                   <label>Contraseña temporal</label>
-                  <input formControlName="password" type="password" />
-                  <small
-                    class="field-help"
-                    *ngIf="
-                      formCrear.get('password')?.touched &&
-                      formCrear.get('password')?.hasError('pattern')
-                    "
-                  >
-                    Debe tener 10+ caracteres, mayúscula, minúscula, número y símbolo.
-                  </small>
+                  <div class="password-field">
+                    <input
+                      formControlName="password"
+                      [type]="mostrarPasswordCrear ? 'text' : 'password'"
+                      [appProgressivePasswordMask]="!mostrarPasswordCrear"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      (click)="mostrarPasswordCrear = !mostrarPasswordCrear"
+                    >
+                      {{ mostrarPasswordCrear ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -176,7 +203,7 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
                 <button type="button" class="btn-secondary" [disabled]="loadingModal" (click)="cerrarModal()">
                   Cancelar
                 </button>
-                <button class="btn-primary" [disabled]="loadingModal || formCrear.invalid">
+                <button class="btn-primary" [disabled]="loadingModal">
                   {{ loadingModal ? 'Guardando...' : 'Crear usuario' }}
                 </button>
               </div>
@@ -194,23 +221,27 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
 
               <div>
                 <label>Nueva contraseña</label>
-                <input formControlName="nuevaPassword" type="password" />
-                <small
-                  class="field-help"
-                  *ngIf="
-                    formReset.get('nuevaPassword')?.touched &&
-                    formReset.get('nuevaPassword')?.hasError('pattern')
-                  "
-                >
-                  Debe tener 10+ caracteres, mayúscula, minúscula, número y símbolo.
-                </small>
+                <div class="password-field">
+                  <input
+                    formControlName="nuevaPassword"
+                    [type]="mostrarPasswordReset ? 'text' : 'password'"
+                    [appProgressivePasswordMask]="!mostrarPasswordReset"
+                  />
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    (click)="mostrarPasswordReset = !mostrarPasswordReset"
+                  >
+                    {{ mostrarPasswordReset ? 'Ocultar' : 'Mostrar' }}
+                  </button>
+                </div>
               </div>
 
               <div class="modal-actions">
                 <button type="button" class="btn-secondary" [disabled]="loadingModal" (click)="cerrarModal()">
                   Cancelar
                 </button>
-                <button class="btn-primary" [disabled]="loadingModal || formReset.invalid">
+                <button class="btn-primary" [disabled]="loadingModal">
                   {{ loadingModal ? 'Guardando...' : 'Actualizar clave' }}
                 </button>
               </div>
@@ -285,6 +316,14 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
         [message]="alertaExitoMensaje"
         variant="success"
         (accepted)="cerrarAlertaExito()"
+      />
+
+      <app-alert-modal
+        [open]="alertAvisoAbierto"
+        title="Revisa la información"
+        [message]="alertaAvisoMensaje"
+        variant="warning"
+        (accepted)="cerrarAlertaAviso()"
       />
     </div>
   `,
@@ -385,6 +424,28 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
         margin: 0;
         font-size: 0.92rem;
         color: #42556a;
+      }
+
+      .password-field {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .password-toggle {
+        border: 1px solid #c7d2df;
+        background: #f8fafc;
+        color: #25354a;
+        border-radius: 10px;
+        padding: 0.35rem 0.7rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .password-toggle:hover {
+        background: #eef3f9;
       }
 
       .usuarios-selector-scroll {
@@ -507,17 +568,6 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
         gap: 0.08rem;
       }
 
-      .modal-error {
-        margin: 0;
-      }
-
-      .field-help {
-        display: inline-block;
-        margin-top: 0.35rem;
-        font-size: 0.82rem;
-        color: #7d4c00;
-      }
-
       .modal-actions {
         display: flex;
         justify-content: flex-end;
@@ -539,6 +589,7 @@ type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' |
 })
 export class UsuariosComponent implements OnInit {
   private readonly usuariosService = inject(UsuariosService);
+  private readonly authService = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/;
 
@@ -550,15 +601,35 @@ export class UsuariosComponent implements OnInit {
   loadingModal = false;
   alertExitoAbierto = false;
   alertaExitoMensaje = '';
+  alertAvisoAbierto = false;
+  alertaAvisoMensaje = '';
+  mostrarPasswordCrear = false;
+  mostrarPasswordReset = false;
 
   errorOperacion = '';
+  readonly jafOptions: Array<{ valor: Jaf; etiqueta: string }> = [
+    { valor: 'TARAPACA', etiqueta: 'JAF Tarapacá' },
+    { valor: 'ANTOFAGASTA', etiqueta: 'JAF Antofagasta' },
+    { valor: 'ARICA_PARINACOTA', etiqueta: 'JAF Arica y Parinacota' },
+  ];
+  readonly rolesMaster: Array<{ valor: RolUsuario; etiqueta: string }> = [
+    { valor: 'ADMINISTRADOR', etiqueta: 'Administrador' },
+    { valor: 'OPERADOR', etiqueta: 'Operador' },
+    { valor: 'CONSULTA', etiqueta: 'Consulta' },
+    { valor: 'AUDITOR', etiqueta: 'Auditor' },
+  ];
+  readonly rolesOperativo: Array<{ valor: RolUsuario; etiqueta: string }> = [
+    { valor: 'OPERADOR', etiqueta: 'Operador' },
+    { valor: 'CONSULTA', etiqueta: 'Consulta' },
+  ];
 
   readonly formCrear = this.fb.group({
-    run: ['', [Validators.required]],
+    run: ['', [Validators.required, this.validarRunChileno]],
     grado: ['', [Validators.required]],
     nombre: ['', [Validators.required]],
     apellidos: ['', [Validators.required]],
     rol: ['OPERADOR', [Validators.required]],
+    jaf: ['TARAPACA'],
     password: ['', [Validators.required, Validators.pattern(this.passwordPattern)]],
   });
 
@@ -592,12 +663,51 @@ export class UsuariosComponent implements OnInit {
   }
 
   get puedeDesactivarSeleccionado(): boolean {
-    return Boolean(this.usuarioSeleccionado?.activo);
+    return Boolean(this.usuarioSeleccionado?.activo && !this.esAutoseleccion);
   }
 
   get puedeActivarSeleccionado(): boolean {
     const seleccionado = this.usuarioSeleccionado;
     return Boolean(seleccionado && !seleccionado.activo);
+  }
+
+  get puedeResetearSeleccionado(): boolean {
+    return Boolean(this.usuarioSeleccionado && !this.esAutoseleccion);
+  }
+
+  get puedeEliminarSeleccionado(): boolean {
+    return Boolean(this.usuarioSeleccionado && !this.esAutoseleccion);
+  }
+
+  get esAutoseleccion(): boolean {
+    const actualId = this.authService.currentUser?.id;
+    const seleccionadoId = this.usuarioSeleccionado?.id;
+    return Boolean(actualId && seleccionadoId && actualId === seleccionadoId);
+  }
+
+  get requiereJafCrear(): boolean {
+    const rol = this.formCrear.get('rol')?.value;
+    return rol === 'ADMINISTRADOR' || rol === 'OPERADOR' || rol === 'CONSULTA';
+  }
+
+  get esAdminMasterActual(): boolean {
+    return Boolean(this.authService.currentUser?.esMaster);
+  }
+
+  get puedeEditarJafCrear(): boolean {
+    return this.esAdminMasterActual;
+  }
+
+  get jafAdminOperativo(): Jaf | null {
+    const jaf = this.authService.currentUser?.jaf;
+    if (jaf === 'TARAPACA' || jaf === 'ANTOFAGASTA' || jaf === 'ARICA_PARINACOTA') {
+      return jaf;
+    }
+    return null;
+  }
+
+  get rolesDisponiblesCrear(): Array<{ valor: RolUsuario; etiqueta: string }> {
+    return this.esAdminMasterActual ? this.rolesMaster : this.rolesOperativo;
   }
 
   isUsuarioSeleccionadoListado(usuarioId: string): boolean {
@@ -613,6 +723,10 @@ export class UsuariosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.formCrear.get('rol')?.valueChanges.subscribe(() => {
+      this.actualizarValidacionJafCrear();
+    });
+    this.actualizarValidacionJafCrear();
     this.cargar();
   }
 
@@ -634,7 +748,7 @@ export class UsuariosComponent implements OnInit {
           }
         },
         error: (error) => {
-          this.errorOperacion = this.getErrorMessage(error);
+          this.abrirAlertaAviso(this.getErrorMessage(error));
         },
       });
   }
@@ -649,14 +763,30 @@ export class UsuariosComponent implements OnInit {
     this.resetMensajes();
 
     if (modal !== 'CREAR' && !this.usuarioSeleccionado) {
-      this.errorOperacion = 'Debes seleccionar un usuario en el listado.';
+      this.abrirAlertaAviso('Debes seleccionar un usuario en el listado.');
+      return;
+    }
+
+    if (
+      this.esAutoseleccion &&
+      (modal === 'RESET' || modal === 'DESACTIVAR' || modal === 'ELIMINAR')
+    ) {
+      this.abrirAlertaAviso(
+        'No puedes aplicar esta acción sobre tu propio usuario.',
+      );
       return;
     }
 
     this.loadingModal = false;
 
     if (modal === 'CREAR') {
-      this.formCrear.reset({ rol: 'OPERADOR' });
+      const rolInicial: RolUsuario = this.esAdminMasterActual ? 'OPERADOR' : 'OPERADOR';
+      const jafInicial = this.esAdminMasterActual
+        ? 'TARAPACA'
+        : (this.jafAdminOperativo ?? 'TARAPACA');
+      this.formCrear.reset({ rol: rolInicial, jaf: jafInicial });
+      this.actualizarValidacionJafCrear();
+      this.mostrarPasswordCrear = false;
     }
 
     if (modal === 'RESET') {
@@ -664,6 +794,7 @@ export class UsuariosComponent implements OnInit {
         usuarioId: this.usuarioSeleccionadoId ?? '',
         nuevaPassword: '',
       });
+      this.mostrarPasswordReset = false;
     }
 
     if (modal === 'DESACTIVAR') {
@@ -695,14 +826,29 @@ export class UsuariosComponent implements OnInit {
     if (this.formCrear.invalid || this.loadingModal) {
       this.formCrear.markAllAsTouched();
       if (this.formCrear.invalid) {
-        this.errorOperacion =
-          'Revisa los campos obligatorios. La contraseña debe cumplir la política de seguridad.';
+        this.abrirAlertaAviso(this.getCreateValidationMessage());
       }
       return;
     }
 
     this.loadingModal = true;
     const raw = this.formCrear.getRawValue();
+    const rol = (raw.rol as RolUsuario) ?? 'OPERADOR';
+    const rolPermitido = this.rolesDisponiblesCrear.some((option) => option.valor === rol);
+    if (!rolPermitido) {
+      this.loadingModal = false;
+      this.abrirAlertaAviso('No tienes permisos para crear usuarios con ese rol.');
+      return;
+    }
+    const requiereJaf =
+      rol === 'ADMINISTRADOR' || rol === 'OPERADOR' || rol === 'CONSULTA';
+    const jafOperativo = this.jafAdminOperativo;
+    const jaf =
+      requiereJaf && raw.jaf
+        ? (this.esAdminMasterActual
+            ? (raw.jaf as Jaf)
+            : (jafOperativo ?? (raw.jaf as Jaf)))
+        : undefined;
 
     this.usuariosService
       .crear({
@@ -710,9 +856,8 @@ export class UsuariosComponent implements OnInit {
         grado: raw.grado ?? '',
         nombre: raw.nombre ?? '',
         apellidos: raw.apellidos ?? '',
-        rol:
-          (raw.rol as 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR') ??
-          'OPERADOR',
+        rol,
+        jaf,
         password: raw.password ?? '',
       })
       .subscribe({
@@ -724,7 +869,7 @@ export class UsuariosComponent implements OnInit {
         },
         error: (error) => {
           this.loadingModal = false;
-          this.errorOperacion = this.getErrorMessage(error);
+          this.abrirAlertaAviso(this.getErrorMessage(error));
         },
       });
   }
@@ -734,6 +879,9 @@ export class UsuariosComponent implements OnInit {
 
     if (this.formReset.invalid || this.loadingModal) {
       this.formReset.markAllAsTouched();
+      if (this.formReset.invalid) {
+        this.abrirAlertaAviso(this.getResetValidationMessage());
+      }
       return;
     }
 
@@ -749,7 +897,7 @@ export class UsuariosComponent implements OnInit {
       },
       error: (error) => {
         this.loadingModal = false;
-        this.errorOperacion = this.getErrorMessage(error);
+        this.abrirAlertaAviso(this.getErrorMessage(error));
       },
     });
   }
@@ -764,12 +912,12 @@ export class UsuariosComponent implements OnInit {
 
     const seleccionado = this.usuarioSeleccionado;
     if (!seleccionado) {
-      this.errorOperacion = 'Debes seleccionar un usuario.';
+      this.abrirAlertaAviso('Debes seleccionar un usuario.');
       return;
     }
 
     if (!seleccionado.activo) {
-      this.errorOperacion = 'El usuario seleccionado ya está inactivo.';
+      this.abrirAlertaAviso('El usuario seleccionado ya está inactivo.');
       return;
     }
 
@@ -784,7 +932,7 @@ export class UsuariosComponent implements OnInit {
       },
       error: (error) => {
         this.loadingModal = false;
-        this.errorOperacion = this.getErrorMessage(error);
+        this.abrirAlertaAviso(this.getErrorMessage(error));
       },
     });
   }
@@ -799,12 +947,12 @@ export class UsuariosComponent implements OnInit {
 
     const seleccionado = this.usuarioSeleccionado;
     if (!seleccionado) {
-      this.errorOperacion = 'Debes seleccionar un usuario.';
+      this.abrirAlertaAviso('Debes seleccionar un usuario.');
       return;
     }
 
     if (seleccionado.activo) {
-      this.errorOperacion = 'El usuario seleccionado ya está activo.';
+      this.abrirAlertaAviso('El usuario seleccionado ya está activo.');
       return;
     }
 
@@ -819,7 +967,7 @@ export class UsuariosComponent implements OnInit {
       },
       error: (error) => {
         this.loadingModal = false;
-        this.errorOperacion = this.getErrorMessage(error);
+        this.abrirAlertaAviso(this.getErrorMessage(error));
       },
     });
   }
@@ -834,7 +982,7 @@ export class UsuariosComponent implements OnInit {
 
     const seleccionado = this.usuarioSeleccionado;
     if (!seleccionado) {
-      this.errorOperacion = 'Debes seleccionar un usuario.';
+      this.abrirAlertaAviso('Debes seleccionar un usuario.');
       return;
     }
 
@@ -849,7 +997,7 @@ export class UsuariosComponent implements OnInit {
       },
       error: (error) => {
         this.loadingModal = false;
-        this.errorOperacion = this.getErrorMessage(error);
+        this.abrirAlertaAviso(this.getErrorMessage(error));
       },
     });
   }
@@ -858,12 +1006,28 @@ export class UsuariosComponent implements OnInit {
     const target = event.target as HTMLInputElement;
     const formateado = formatRunForInput(target.value);
 
-    this.formCrear.patchValue(
-      {
-        run: formateado,
-      },
-      { emitEvent: false },
-    );
+    this.formCrear.patchValue({ run: formateado }, { emitEvent: false });
+    this.formCrear.get('run')?.updateValueAndValidity({ emitEvent: false });
+  }
+
+  onRolCrearChange(): void {
+    this.actualizarValidacionJafCrear();
+  }
+
+  etiquetaJaf(jaf: UsuarioListado['jaf']): string {
+    if (jaf === 'TARAPACA') {
+      return 'JAF Tarapacá';
+    }
+
+    if (jaf === 'ANTOFAGASTA') {
+      return 'JAF Antofagasta';
+    }
+
+    if (jaf === 'ARICA_PARINACOTA') {
+      return 'JAF Arica y Parinacota';
+    }
+
+    return '-';
   }
 
   private obtenerUsuarioPorId(usuarioId: string | null | undefined): UsuarioListado | null {
@@ -887,8 +1051,111 @@ export class UsuariosComponent implements OnInit {
     this.alertaExitoMensaje = '';
   }
 
+  cerrarAlertaAviso(): void {
+    this.alertAvisoAbierto = false;
+    this.alertaAvisoMensaje = '';
+  }
+
+  abrirAlertaAviso(mensaje: string): void {
+    this.alertaAvisoMensaje = mensaje;
+    this.alertAvisoAbierto = true;
+  }
+
   private resetMensajes(): void {
     this.errorOperacion = '';
+  }
+
+  private getCreateValidationMessage(): string {
+    const faltantes: string[] = [];
+    const run = this.formCrear.get('run');
+    const grado = this.formCrear.get('grado');
+    const nombre = this.formCrear.get('nombre');
+    const apellidos = this.formCrear.get('apellidos');
+    const rol = this.formCrear.get('rol');
+    const jaf = this.formCrear.get('jaf');
+    const password = this.formCrear.get('password');
+
+    if (run?.invalid) faltantes.push('RUN');
+    if (grado?.invalid) faltantes.push('grado');
+    if (nombre?.invalid) faltantes.push('nombre');
+    if (apellidos?.invalid) faltantes.push('apellidos');
+    if (rol?.invalid) faltantes.push('rol');
+    if (this.requiereJafCrear && jaf?.invalid) faltantes.push('JAF');
+
+    if (password?.hasError('required')) {
+      faltantes.push('contraseña temporal');
+    }
+    if (password?.hasError('pattern')) {
+      return 'La contraseña temporal debe tener 10 o más caracteres, incluir mayúscula, minúscula, número y símbolo.';
+    }
+
+    if (run?.hasError('runChilenoInvalido')) {
+      return 'El RUN ingresado no es válido para Chile. Verifica el formato y el dígito verificador.';
+    }
+
+    if (faltantes.length > 0) {
+      return `Falta completar: ${faltantes.join(', ')}.`;
+    }
+
+    return 'Revisa los datos del usuario antes de continuar.';
+  }
+
+  private validarRunChileno(
+    control: AbstractControl,
+  ): ValidationErrors | null {
+    const value = String(control.value ?? '').trim();
+
+    if (!value) {
+      return null;
+    }
+
+    return isRunChilenoValido(value) ? null : { runChilenoInvalido: true };
+  }
+
+  private getResetValidationMessage(): string {
+    const password = this.formReset.get('nuevaPassword');
+
+    if (password?.hasError('required')) {
+      return 'Debes ingresar la nueva contraseña.';
+    }
+
+    if (password?.hasError('pattern')) {
+      return 'La nueva contraseña debe tener 10 o más caracteres, incluir mayúscula, minúscula, número y símbolo.';
+    }
+
+    return 'Revisa la información antes de actualizar la clave.';
+  }
+
+  private actualizarValidacionJafCrear(): void {
+    const jafControl = this.formCrear.get('jaf');
+    if (!jafControl) {
+      return;
+    }
+
+    if (this.requiereJafCrear) {
+      jafControl.setValidators([Validators.required]);
+      if (this.esAdminMasterActual) {
+        if (!jafControl.value) {
+          jafControl.setValue('TARAPACA', { emitEvent: false });
+        }
+        jafControl.enable({ emitEvent: false });
+      } else {
+        const jafOperativo = this.jafAdminOperativo;
+        if (!jafOperativo) {
+          this.abrirAlertaAviso(
+            'Tu cuenta de Administrador Operativo no tiene JAF asignada. Contacta al Administrador Master.',
+          );
+        }
+        jafControl.setValue(jafOperativo ?? 'TARAPACA', { emitEvent: false });
+        jafControl.disable({ emitEvent: false });
+      }
+    } else {
+      jafControl.clearValidators();
+      jafControl.setValue('', { emitEvent: false });
+      jafControl.disable({ emitEvent: false });
+    }
+
+    jafControl.updateValueAndValidity({ emitEvent: false });
   }
 
   private getErrorMessage(error: unknown): string {
