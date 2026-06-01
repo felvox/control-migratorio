@@ -22,10 +22,14 @@ export class UsuariosService {
     Role.ADMINISTRADOR,
     Role.OPERADOR,
     Role.CONSULTA,
+    Role.CARABINEROS,
+    Role.PDI,
   ]);
   private readonly rolesGestionablesPorOperativo = new Set<Role>([
     Role.OPERADOR,
     Role.CONSULTA,
+    Role.CARABINEROS,
+    Role.PDI,
   ]);
 
   constructor(
@@ -60,7 +64,7 @@ export class UsuariosService {
       }
 
       throw new ForbiddenException(
-        'El Administrador Operativo solo puede gestionar usuarios Operador o Consulta.',
+        'El Administrador Operativo solo puede gestionar usuarios Operador, Consulta, Carabineros o PDI.',
       );
     }
   }
@@ -95,7 +99,7 @@ export class UsuariosService {
 
       if (!jaf) {
         throw new BadRequestException(
-          'Debe asignar una JAF para usuarios Administrador Operativo, Operador o Consulta',
+          'Debe asignar una JAF para usuarios Administrador Operativo, Operador, Consulta, Carabineros o PDI',
         );
       }
 
@@ -224,7 +228,7 @@ export class UsuariosService {
     const esOperativo = this.esAdministradorOperativo(actor);
     if (esOperativo && query.rol && !this.rolesGestionablesPorOperativo.has(query.rol)) {
       throw new ForbiddenException(
-        'El Administrador Operativo solo puede listar usuarios Operador o Consulta.',
+        'El Administrador Operativo solo puede listar usuarios Operador, Consulta, Carabineros o PDI.',
       );
     }
 
@@ -232,7 +236,8 @@ export class UsuariosService {
       eliminadoAt: null,
       esMaster: false,
       rol: esOperativo
-        ? query.rol ?? { in: [Role.OPERADOR, Role.CONSULTA] }
+        ? query.rol ??
+          { in: [Role.OPERADOR, Role.CONSULTA, Role.CARABINEROS, Role.PDI] }
         : query.rol,
       jaf: esOperativo ? this.obtenerJafActor(actor) : query.jaf,
       activo: query.activo,
@@ -272,9 +277,9 @@ export class UsuariosService {
           actualizadoAt: true,
           sesiones: {
             take: 1,
-            orderBy: { inicioSesion: 'desc' },
+            orderBy: { ultimaActividadAt: 'desc' },
             select: {
-              inicioSesion: true,
+              ultimaActividadAt: true,
             },
           },
         },
@@ -283,7 +288,7 @@ export class UsuariosService {
 
     const usuarios = items.map((item) => ({
       ...item,
-      ultimoAcceso: item.sesiones[0]?.inicioSesion ?? null,
+      ultimoAcceso: item.sesiones[0]?.ultimaActividadAt ?? null,
       sesiones: undefined,
     }));
 

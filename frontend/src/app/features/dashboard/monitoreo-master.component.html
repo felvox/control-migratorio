@@ -1,0 +1,139 @@
+<div class="page-grid">
+  <article class="card">
+    <div class="filters-head">
+      <h3>Monitoreo general de casos</h3>
+      <button class="btn-secondary" type="button" (click)="limpiarFiltros()">
+        Limpiar filtros
+      </button>
+    </div>
+
+    <form [formGroup]="filtrosForm" class="form-grid monitor-grid">
+      <div>
+        <label>Fecha desde</label>
+        <input type="date" formControlName="fechaDesde" />
+      </div>
+      <div>
+        <label>Fecha hasta</label>
+        <input type="date" formControlName="fechaHasta" />
+      </div>
+      <div>
+        <label>JAF</label>
+        <select formControlName="jaf">
+          <option value="">Todas las JAF</option>
+          <option value="TARAPACA">JAF Tarapacá</option>
+          <option value="ANTOFAGASTA">JAF Antofagasta</option>
+          <option value="ARICA_PARINACOTA">JAF Arica y Parinacota</option>
+        </select>
+      </div>
+    </form>
+  </article>
+
+  <article class="card" *ngIf="!cargando && data as d">
+    <div class="kpi-grid">
+      <div class="kpi kpi-blue">
+        <span class="kpi-icon">📋</span>
+        <span class="kpi-label">Casos creados</span>
+        <strong>{{ d.totales.creados }}</strong>
+      </div>
+      <div class="kpi kpi-yellow">
+        <span class="kpi-icon">⏳</span>
+        <span class="kpi-label">Pendientes</span>
+        <strong>{{ d.totales.pendientes }}</strong>
+      </div>
+      <div class="kpi kpi-teal">
+        <span class="kpi-icon">
+          <img
+            class="kpi-icon-logo kpi-icon-logo--carabineros"
+            src="/assets/logo-carabineros-chile.svg"
+            alt="Carabineros"
+          />
+        </span>
+        <span class="kpi-label">Derivados a Carabineros</span>
+        <strong>{{ d.totales.derivadosCarabineros }}</strong>
+      </div>
+      <div class="kpi kpi-indigo">
+        <span class="kpi-icon">
+          <img class="kpi-icon-logo kpi-icon-logo--pdi" src="/assets/logo-pdi-chile.png" alt="PDI" />
+        </span>
+        <span class="kpi-label">Derivados a PDI</span>
+        <strong>{{ d.totales.derivadosPdi }}</strong>
+      </div>
+      <div class="kpi kpi-sky">
+        <span class="kpi-icon">
+          <img
+            class="kpi-icon-logo kpi-icon-logo--carabineros"
+            src="/assets/logo-carabineros-chile.svg"
+            alt="Carabineros"
+          />
+        </span>
+        <span class="kpi-label">Por revisar Carabineros</span>
+        <strong>{{ d.totales.porRevisarCarabineros }}</strong>
+      </div>
+      <div class="kpi kpi-sky">
+        <span class="kpi-icon">
+          <img class="kpi-icon-logo kpi-icon-logo--pdi" src="/assets/logo-pdi-chile.png" alt="PDI" />
+        </span>
+        <span class="kpi-label">Por revisar PDI</span>
+        <strong>{{ d.totales.porRevisarPdi }}</strong>
+      </div>
+      <div class="kpi kpi-green">
+        <span class="kpi-icon">✅</span>
+        <span class="kpi-label">Casos cerrados</span>
+        <strong>{{ d.totales.cerrados }}</strong>
+      </div>
+      <div class="kpi kpi-orange">
+        <span class="kpi-icon">🪪</span>
+        <span class="kpi-label">No documentados</span>
+        <strong>{{ d.totales.noDocumentados }}</strong>
+      </div>
+      <div class="kpi kpi-emerald">
+        <span class="kpi-icon">👶</span>
+        <span class="kpi-label">Con menores de edad</span>
+        <strong>{{ d.totales.conMenores }}</strong>
+      </div>
+      <div class="kpi kpi-purple">
+        <span class="kpi-icon">🌎</span>
+        <span class="kpi-label">Nacionalidad top</span>
+        <strong class="kpi-value-text">{{ d.nacionalidadTop.nacionalidad }} ({{ d.nacionalidadTop.total }})</strong>
+      </div>
+    </div>
+  </article>
+
+  <article class="card table-wrap" *ngIf="!cargando && data as d">
+    <h3>Detalle por JAF</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>JAF</th>
+          <th>Creados</th>
+          <th>Pendientes</th>
+          <th>Derivados Carabineros</th>
+          <th>Derivados PDI</th>
+          <th>Por revisar Carabineros</th>
+          <th>Por revisar PDI</th>
+          <th>Cerrados</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of d.porJaf">
+          <td>{{ etiquetaJaf(row.jaf) }}</td>
+          <td>{{ row.creados }}</td>
+          <td>{{ row.pendientes }}</td>
+          <td>{{ row.derivadosCarabineros }}</td>
+          <td>{{ row.derivadosPdi }}</td>
+          <td>{{ row.porRevisarCarabineros }}</td>
+          <td>{{ row.porRevisarPdi }}</td>
+          <td>{{ row.cerrados }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </article>
+
+  <article class="card" *ngIf="cargando">
+    Cargando monitoreo...
+  </article>
+
+  <article class="card" *ngIf="!cargando && errorCarga">
+    {{ errorCarga }}
+  </article>
+</div>

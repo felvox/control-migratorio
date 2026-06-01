@@ -1,28 +1,32 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Role, TipoEvidencia } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UploadEvidenciaDto } from './dto/upload-evidencia.dto';
 import { AuthUser } from '../../common/interfaces/auth-user.interface';
 import { AuditoriaService } from '../auditoria/auditoria.service';
 import { promises as fs } from 'fs';
-import { extname, join, resolve } from 'path';
+import { join, resolve } from 'path';
 import { randomUUID } from 'crypto';
+import {
+  esArchivoPermitido,
+  esArchivoWord,
+  normalizarArchivoSubido,
+  obtenerSubcarpetaEvidencia,
+  validarTamanoArchivo,
+} from './evidencias-archivo.utils';
+import {
+  validarEliminacionInstitucional,
+  validarEtapaCargaInstitucional,
+  validarPersonaRequerida,
+} from './evidencias-flujo.utils';
+import { validarAccesoInstitucionalCaso } from '../casos/casos-acceso-institucional.utils';
 
 @Injectable()
 export class EvidenciasService {
-  private readonly allowedMimeTypes = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'application/pdf',
-  ];
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
@@ -36,7 +40,34 @@ export class EvidenciasService {
     );
   }
 
-  private async validarAccesoCaso(casoId: string, user: AuthUser) {
+  async convertirWordAPdf(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Debe adjuntar un archivo Word');
+    }
+
+    const maxUploadSizeMb = this.configService.get<number>(
+      'storage.maxUploadSizeMb',
+      10,
+    );
+    validarTamanoArchivo(file, maxUploadSizeMb);
+
+    if (!esArchivoWord(file)) {
+      throw new BadRequestException('Debe adjuntar un archivo doc o docx');
+    }
+
+    const archivo = await normalizarArchivoSubido(file);
+
+    return {
+      buffer: archivo.buffer,
+      nombreOriginal: archivo.nombreOriginal,
+    };
+  }
+
+  private async validarAccesoCaso(
+    casoId: string,
+    user: AuthUser,
+    restringirOperadorACreador = false,
+  ) {
     const caso = await this.prisma.caso.findFirst({
       where: {
         id: casoId,
@@ -47,6 +78,9 @@ export class EvidenciasService {
         codigo: true,
         creadoPorId: true,
         jaf: true,
+        estado: true,
+        institucionDerivacion: true,
+        existenMenores: true,
       },
     });
 
@@ -54,17 +88,13 @@ export class EvidenciasService {
       throw new NotFoundException('Caso no encontrado');
     }
 
-    if (user.role === Role.OPERADOR && caso.creadoPorId !== user.id) {
-      throw new ForbiddenException('No tiene permisos para este caso');
-    }
-
-    if (
-      user.role === Role.ADMINISTRADOR &&
-      !user.esMaster &&
-      (!user.jaf || caso.jaf !== user.jaf)
-    ) {
-      throw new ForbiddenException('No tiene permisos para casos de otra JAF');
-    }
+    validarAccesoInstitucionalCaso(caso, user, {
+      noPermisoPropio: 'No tiene permisos para este caso',
+      noPermisoJaf: 'No tiene permisos para casos de otra JAF',
+      noPermisoCarabineros:
+        'Solo puede consultar evidencias de casos de Carabineros o seguimiento de menores derivados a PDI',
+      noPermisoPdi: 'Solo puede consultar evidencias de casos derivados a PDI',
+    }, { restringirOperadorACreador });
 
     return caso;
   }
@@ -93,31 +123,6 @@ export class EvidenciasService {
     return persona;
   }
 
-  private getSubcarpeta(
-    dto: UploadEvidenciaDto,
-    casoId: string,
-    personaId?: string,
-  ): string {
-    const baseCaso = `casos/caso-${casoId}`;
-
-    if (dto.tipoEvidencia === TipoEvidencia.ADJUNTO_GENERAL) {
-      return `${baseCaso}/adjuntos`;
-    }
-
-    if (!personaId) {
-      throw new BadRequestException(
-        'personaId es obligatorio para foto o documento de identidad',
-      );
-    }
-
-    const personaBase = `${baseCaso}/persona-${personaId}`;
-
-    if (dto.tipoEvidencia === TipoEvidencia.FOTO_PERSONA) {
-      return `${personaBase}/foto-persona`;
-    }
-
-    return `${personaBase}/documento-identidad`;
-  }
 
   async subirEvidencia(
     casoId: string,
@@ -134,53 +139,39 @@ export class EvidenciasService {
       'storage.maxUploadSizeMb',
       10,
     );
-    const maxBytes = maxUploadSizeMb * 1024 * 1024;
+    validarTamanoArchivo(file, maxUploadSizeMb);
 
-    if (file.size > maxBytes) {
+    if (!esArchivoPermitido(file)) {
       throw new BadRequestException(
-        `El archivo excede el límite de ${maxUploadSizeMb}MB`,
+        'Tipo de archivo inválido. Permitidos: jpg, jpeg, png, pdf, doc, docx',
       );
     }
 
-    if (!this.allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException(
-        'Tipo de archivo inválido. Permitidos: jpg, jpeg, png, pdf',
-      );
-    }
-
-    const caso = await this.validarAccesoCaso(casoId, user);
-
-    const requierePersona =
-      dto.tipoEvidencia === TipoEvidencia.FOTO_PERSONA ||
-      dto.tipoEvidencia === TipoEvidencia.DOCUMENTO_IDENTIDAD;
-
-    if (requierePersona && !dto.personaId) {
-      throw new BadRequestException(
-        'personaId es obligatorio para este tipo de evidencia',
-      );
-    }
+    const caso = await this.validarAccesoCaso(casoId, user, true);
+    validarEtapaCargaInstitucional(caso, dto, user);
+    validarPersonaRequerida(dto);
 
     const persona = await this.validarPersona(casoId, dto.personaId);
 
-    const extension = extname(file.originalname).toLowerCase();
-    const nombreGuardado = `${Date.now()}-${randomUUID()}${extension}`;
-    const subcarpeta = this.getSubcarpeta(dto, casoId, dto.personaId);
+    const archivoNormalizado = await normalizarArchivoSubido(file);
+    const nombreGuardado = `${Date.now()}-${randomUUID()}${archivoNormalizado.extension}`;
+    const subcarpeta = obtenerSubcarpetaEvidencia(dto, casoId, dto.personaId);
     const rutaArchivoRelativa = `${subcarpeta}/${nombreGuardado}`;
     const rutaAbsoluta = join(this.storageRoot, rutaArchivoRelativa);
 
     await fs.mkdir(join(this.storageRoot, subcarpeta), { recursive: true });
-    await fs.writeFile(rutaAbsoluta, file.buffer);
+    await fs.writeFile(rutaAbsoluta, archivoNormalizado.buffer);
 
     const evidencia = await this.prisma.evidencia.create({
       data: {
         casoId,
         personaId: dto.personaId,
         tipoEvidencia: dto.tipoEvidencia,
-        nombreOriginal: file.originalname,
+        nombreOriginal: archivoNormalizado.nombreOriginal,
         nombreGuardado,
         rutaArchivo: rutaArchivoRelativa,
-        mimeType: file.mimetype,
-        tamanoBytes: file.size,
+        mimeType: archivoNormalizado.mimeType,
+        tamanoBytes: archivoNormalizado.tamanoBytes,
         creadoPorId: user.id,
       },
     });
@@ -196,6 +187,8 @@ export class EvidenciasService {
         tipoEvidencia: dto.tipoEvidencia,
         personaId: dto.personaId,
         persona: persona ? `${persona.nombres} ${persona.apellidos}` : null,
+        convertidoDesdeWord: archivoNormalizado.fueConvertidoDesdeWord,
+        nombreOriginalSubido: file.originalname,
       },
       ip: meta?.ip,
       userAgent: meta?.userAgent,
@@ -240,6 +233,8 @@ export class EvidenciasService {
             codigo: true,
             creadoPorId: true,
             jaf: true,
+            institucionDerivacion: true,
+            existenMenores: true,
           },
         },
       },
@@ -249,17 +244,13 @@ export class EvidenciasService {
       throw new NotFoundException('Evidencia no encontrada');
     }
 
-    if (user.role === Role.OPERADOR && evidencia.caso.creadoPorId !== user.id) {
-      throw new ForbiddenException('No tiene permisos para esta evidencia');
-    }
-
-    if (
-      user.role === Role.ADMINISTRADOR &&
-      !user.esMaster &&
-      (!user.jaf || evidencia.caso.jaf !== user.jaf)
-    ) {
-      throw new ForbiddenException('No tiene permisos para evidencias de otra JAF');
-    }
+    validarAccesoInstitucionalCaso(evidencia.caso, user, {
+      noPermisoPropio: 'No tiene permisos para esta evidencia',
+      noPermisoJaf: 'No tiene permisos para evidencias de otra JAF',
+      noPermisoCarabineros:
+        'Solo puede consultar evidencias de casos de Carabineros o seguimiento de menores derivados a PDI',
+      noPermisoPdi: 'Solo puede consultar evidencias de casos derivados a PDI',
+    });
 
     const rutaAbsoluta = join(this.storageRoot, evidencia.rutaArchivo);
 
@@ -282,5 +273,66 @@ export class EvidenciasService {
       evidencia,
       rutaAbsoluta,
     };
+  }
+
+  async eliminarEvidencia(
+    id: string,
+    user: AuthUser,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    const evidencia = await this.prisma.evidencia.findUnique({
+      where: { id },
+      include: {
+        caso: {
+          select: {
+            id: true,
+            codigo: true,
+            creadoPorId: true,
+            jaf: true,
+            institucionDerivacion: true,
+            existenMenores: true,
+          },
+        },
+      },
+    });
+
+    if (!evidencia) {
+      throw new NotFoundException('Evidencia no encontrada');
+    }
+
+    const caso = await this.validarAccesoCaso(evidencia.casoId, user, true);
+    validarEtapaCargaInstitucional(
+      caso,
+      {
+        tipoEvidencia: evidencia.tipoEvidencia,
+        personaId: evidencia.personaId ?? undefined,
+      },
+      user,
+    );
+    validarEliminacionInstitucional(evidencia.tipoEvidencia, user.role);
+
+    await this.prisma.evidencia.delete({
+      where: { id: evidencia.id },
+    });
+
+    const rutaAbsoluta = join(this.storageRoot, evidencia.rutaArchivo);
+    await fs.unlink(rutaAbsoluta).catch(() => undefined);
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: user.id,
+      casoId: evidencia.casoId,
+      accion: 'ELIMINAR_EVIDENCIA',
+      entidad: 'EVIDENCIA',
+      entidadId: evidencia.id,
+      descripcion: `Evidencia ${evidencia.nombreOriginal} eliminada del caso ${evidencia.caso.codigo}`,
+      metadata: {
+        tipoEvidencia: evidencia.tipoEvidencia,
+        nombreOriginal: evidencia.nombreOriginal,
+      },
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return { id: evidencia.id };
   }
 }

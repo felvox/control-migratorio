@@ -1,0 +1,151 @@
+<div class="page-grid feedback-page">
+  <article class="card">
+    <h3>{{ esMaster ? 'Enviar aviso' : 'Enviar feedback' }}</h3>
+    <p class="muted">{{ textoFormulario }}</p>
+
+    <form [formGroup]="formFeedback" (ngSubmit)="enviarFeedback()" class="page-grid">
+      <div class="form-grid feedback-form-grid">
+        <div>
+          <label>Asunto</label>
+          <input type="text" formControlName="asunto" placeholder="Ej: Mantención programada" />
+        </div>
+
+        <div>
+          <label>Prioridad</label>
+          <select formControlName="prioridad">
+            <option value="BAJA">Baja</option>
+            <option value="MEDIA">Media</option>
+            <option value="ALTA">Alta</option>
+          </select>
+        </div>
+
+        <div *ngIf="esMaster">
+          <label>Destino</label>
+          <select formControlName="jafDestino">
+            <option value="">Todas las JAF</option>
+            <option value="TARAPACA">JAF Tarapacá</option>
+            <option value="ANTOFAGASTA">JAF Antofagasta</option>
+            <option value="ARICA_PARINACOTA">JAF Arica y Parinacota</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label>Mensaje</label>
+        <textarea
+          rows="5"
+          formControlName="mensaje"
+          placeholder="Describe la mejora propuesta o el aviso operativo."
+        ></textarea>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn-primary" type="submit" [disabled]="guardando">
+          {{ guardando ? 'Enviando...' : (esMaster ? 'Enviar aviso' : 'Enviar feedback') }}
+        </button>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="list-head">
+      <h3>{{ esMaster ? 'Bandeja de feedback y avisos' : 'Bandeja de feedback' }}</h3>
+      <div class="filters-inline">
+        <label>Estado</label>
+        <select [value]="estadoFiltro" (change)="cambiarEstadoFiltro($any($event.target).value)">
+          <option *ngFor="let option of estadoOptions" [value]="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Destino</th>
+            <th>Prioridad</th>
+            <th>Asunto</th>
+            <th>Usuario</th>
+            <th>Estado</th>
+            <th>Ver</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of items">
+            <td>{{ item.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ etiquetaDireccion(item) }}</td>
+            <td>{{ etiquetaDestino(item) }}</td>
+            <td>
+              <span class="badge" [class.badge-high]="item.prioridad === 'ALTA'" [class.badge-low]="item.prioridad === 'BAJA'">
+                {{ etiquetaPrioridad(item.prioridad) }}
+              </span>
+            </td>
+            <td>{{ item.asunto }}</td>
+            <td>{{ item.usuario.nombreCompleto }}</td>
+            <td>
+              <span class="badge" [class.badge-reviewed]="item.estado === 'REVISADO'">
+                {{ item.estado === 'REVISADO' ? 'Leído' : 'Pendiente' }}
+              </span>
+            </td>
+            <td>
+              <button
+                class="btn-secondary"
+                type="button"
+                (click)="verMensaje(item)"
+              >
+                Ver mensaje
+              </button>
+            </td>
+          </tr>
+
+          <tr *ngIf="!cargando && items.length === 0">
+            <td colspan="8" class="empty-cell">No hay feedback para mostrar.</td>
+          </tr>
+          <tr *ngIf="cargando">
+            <td colspan="8" class="empty-cell">Cargando feedback...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="muted footer-counter">{{ total }} registro(s)</p>
+  </article>
+</div>
+
+<app-alert-modal
+  [open]="alertExitoAbierto"
+  title="Acción completada"
+  [message]="alertaExitoMensaje"
+  variant="success"
+  (accepted)="alertExitoAbierto = false"
+></app-alert-modal>
+
+<div class="modal-backdrop" *ngIf="modalMensajeAbierto && feedbackSeleccionado as item">
+  <section class="modal-card" role="dialog" aria-modal="true" aria-label="Ver mensaje">
+    <div class="list-head">
+      <h3>{{ item.asunto }}</h3>
+      <span class="muted">{{ item.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+    </div>
+    <p class="muted">
+      {{ etiquetaDireccion(item) }} · {{ etiquetaDestino(item) }} · {{ item.usuario.nombreCompleto }}
+    </p>
+    <article class="mensaje-preview">
+      {{ item.mensaje }}
+    </article>
+    <div class="actions-row">
+      <button class="btn-primary" type="button" (click)="cerrarModalMensaje()">Cerrar</button>
+    </div>
+  </section>
+</div>
+
+<app-alert-modal
+  [open]="alertAvisoAbierto"
+  title="Acción no completada"
+  [message]="alertaAvisoMensaje"
+  variant="warning"
+  (accepted)="alertAvisoAbierto = false"
+></app-alert-modal>

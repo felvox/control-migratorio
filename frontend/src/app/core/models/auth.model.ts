@@ -1,4 +1,10 @@
-export type Rol = 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
+export type Rol =
+  | 'ADMINISTRADOR'
+  | 'OPERADOR'
+  | 'CONSULTA'
+  | 'AUDITOR'
+  | 'CARABINEROS'
+  | 'PDI';
 export type Jaf = 'TARAPACA' | 'ANTOFAGASTA' | 'ARICA_PARINACOTA';
 
 export interface UsuarioSesion {

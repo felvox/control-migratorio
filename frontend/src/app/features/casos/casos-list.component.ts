@@ -1,110 +1,30 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CasosService } from './casos.service';
 import { Caso } from '../../core/models/caso.model';
 import { AuthService } from '../../core/services/auth.service';
+import {
+  etiquetaEstado as etiquetaEstadoPresentacion,
+  etiquetaTipoControl as etiquetaTipoControlPresentacion,
+  estadoClase as estadoClasePresentacion,
+} from './casos-presentacion.utils';
 
 @Component({
   selector: 'app-casos-list',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
-  template: `
-    <div class="page-grid">
-      <article class="card">
-        <form [formGroup]="filtrosForm" class="form-grid" (ngSubmit)="buscar()">
-          <div>
-            <label>Nombre</label>
-            <input formControlName="nombre" />
-          </div>
-          <div>
-            <label>Documento</label>
-            <input formControlName="documento" />
-          </div>
-          <div>
-            <label>Ubicación</label>
-            <input formControlName="ubicacion" />
-          </div>
-          <div>
-            <label>Estado</label>
-            <select formControlName="estado">
-              <option value="">Todos</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="DERIVADO_CARABINEROS">Derivado Carabineros</option>
-              <option value="DERIVADO_PDI">Derivado PDI</option>
-              <option value="CERRADO">Cerrado</option>
-            </select>
-          </div>
-          <div style="align-self: end; display: flex; gap: 0.5rem;">
-            <button class="btn-primary">Buscar</button>
-            <button type="button" class="btn-secondary" (click)="limpiar()">
-              Limpiar
-            </button>
-          </div>
-        </form>
-      </article>
-
-      <article class="card table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Lugar</th>
-              <th>Estado</th>
-              <th>Principal</th>
-              <th>Operador</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let caso of casos">
-              <td>{{ caso.codigo }}</td>
-              <td>{{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}</td>
-              <td>{{ etiquetaTipoControl(caso.tipoControl) }}</td>
-              <td>{{ caso.lugar }}</td>
-              <td><span class="badge">{{ caso.estado }}</span></td>
-              <td>
-                {{ obtenerPrincipal(caso).nombres }} {{ obtenerPrincipal(caso).apellidos }}
-              </td>
-              <td>{{ caso.creadoPor.nombreCompleto }}</td>
-              <td>
-                <button
-                  class="btn-secondary"
-                  (click)="verDetalle(caso.id)"
-                >
-                  Ver
-                </button>
-                <button
-                  class="btn-secondary"
-                  *ngIf="puedeEditar"
-                  (click)="editar(caso.id)"
-                >
-                  Editar
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </article>
-    </div>
-  `,
-  styles: [
-    `
-      td:last-child {
-        display: flex;
-        gap: 0.4rem;
-      }
-    `,
-  ],
+  templateUrl: './casos-list.component.html',
+  styleUrl: './casos-list.component.css',
 })
 export class CasosListComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly casosService = inject(CasosService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly authService = inject(AuthService);
+  private presetFilters: Record<string, string> = {};
 
   casos: Caso[] = [];
 
@@ -112,19 +32,70 @@ export class CasosListComponent implements OnInit {
     return this.authService.hasRole(['ADMINISTRADOR', 'OPERADOR']);
   }
 
+  puedeEditarCaso(caso: Caso): boolean {
+    if (!(this.puedeEditar && caso.estado === 'PENDIENTE')) {
+      return false;
+    }
+
+    const user = this.authService.currentUser;
+    return caso.creadoPor?.id === user?.id;
+  }
+
+  get esConsultaHistoricaInstitucional(): boolean {
+    const rol = this.authService.currentUser?.rol;
+    return (
+      (rol === 'CARABINEROS' || rol === 'PDI') &&
+      this.router.url.split('?')[0] === '/casos'
+    );
+  }
+
+  get ocultarFiltroEstado(): boolean {
+    const ruta = this.router.url.split('?')[0];
+    return (
+      ruta === '/casos/por-revisar-carabineros' ||
+      ruta === '/casos/derivados-pdi' ||
+      ruta === '/casos/por-revisar-pdi'
+    );
+  }
+
   readonly filtrosForm = this.fb.group({
     nombre: [''],
     documento: [''],
     ubicacion: [''],
+    fecha: [''],
     estado: [''],
   });
 
   ngOnInit(): void {
-    this.buscar();
+    this.route.data.subscribe((data) => {
+      this.presetFilters = this.normalizarPresetFilters(
+        (data?.['presetFilters'] as Record<string, unknown> | undefined) ?? {},
+      );
+      this.sincronizarFiltrosConVista();
+      this.buscar();
+    });
   }
 
   buscar(): void {
-    this.casosService.listar(this.filtrosForm.getRawValue() as any).subscribe((res) => {
+    const filtros = this.filtrosForm.getRawValue() as Record<string, string>;
+    const payload: Record<string, string> = {
+      ...filtros,
+      ...this.presetFilters,
+    };
+
+    if (this.esConsultaHistoricaInstitucional) {
+      delete payload['documento'];
+      delete payload['estado'];
+
+      if (filtros['fecha']) {
+        payload['fechaDesde'] = this.inicioDiaIso(filtros['fecha']);
+        payload['fechaHasta'] = this.finDiaIso(filtros['fecha']);
+      }
+    }
+
+    delete payload['fecha'];
+
+    this.casosService.listar(payload).subscribe((res) => {
       this.casos = res.items;
     });
   }
@@ -134,6 +105,7 @@ export class CasosListComponent implements OnInit {
       nombre: '',
       documento: '',
       ubicacion: '',
+      fecha: '',
       estado: '',
     });
     this.buscar();
@@ -152,14 +124,61 @@ export class CasosListComponent implements OnInit {
   }
 
   etiquetaTipoControl(tipoControl: string): string {
-    if (tipoControl === 'INGRESO') {
-      return 'Ingresando';
+    return etiquetaTipoControlPresentacion(tipoControl);
+  }
+
+  etiquetaEstado(estado: string): string {
+    const etiqueta = etiquetaEstadoPresentacion(estado);
+    return etiqueta.replace('Derivado a ', 'Derivado ');
+  }
+
+  estadoClase(estado: string): string {
+    return estadoClasePresentacion(estado);
+  }
+
+  private normalizarPresetFilters(
+    source: Record<string, unknown>,
+  ): Record<string, string> {
+    const entries = Object.entries(source).flatMap(([key, value]) => {
+      if (value === null || value === undefined || value === '') {
+        return [];
+      }
+
+      if (typeof value === 'boolean') {
+        return [[key, value ? 'true' : 'false']];
+      }
+
+      return [[key, String(value)]];
+    });
+
+    return Object.fromEntries(entries);
+  }
+
+  private sincronizarFiltrosConVista(): void {
+    if (this.esConsultaHistoricaInstitucional) {
+      this.filtrosForm.patchValue(
+        {
+          documento: '',
+          estado: '',
+        },
+        { emitEvent: false },
+      );
+      return;
     }
 
-    if (tipoControl === 'EGRESO') {
-      return 'Egresando';
-    }
+    this.filtrosForm.patchValue(
+      {
+        fecha: '',
+      },
+      { emitEvent: false },
+    );
+  }
 
-    return 'No informado';
+  private inicioDiaIso(fecha: string): string {
+    return new Date(`${fecha}T00:00:00.000`).toISOString();
+  }
+
+  private finDiaIso(fecha: string): string {
+    return new Date(`${fecha}T23:59:59.999`).toISOString();
   }
 }

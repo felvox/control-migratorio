@@ -1,0 +1,17 @@
+    <div class="alert-backdrop" *ngIf="open">
+      <section class="alert-card" role="alertdialog" aria-modal="true" [attr.aria-label]="title || 'Notificación'">
+        <div class="alert-icon" [class.alert-icon-warning]="variant === 'warning'" aria-hidden="true">
+          {{ variant === 'warning' ? '!' : '✓' }}
+        </div>
+        <div class="alert-content">
+          <h4>{{ title }}</h4>
+          <p>{{ message }}</p>
+        </div>
+        <div class="alert-actions">
+          <button type="button" class="btn-primary" (click)="accepted.emit()">
+            {{ buttonText }}
+          </button>
+        </div>
+      </section>
+    </div>
+  

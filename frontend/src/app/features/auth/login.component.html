@@ -1,0 +1,97 @@
+    <div class="login-shell">
+      <div class="login-overlay"></div>
+
+      <div class="login-panel">
+        <section class="left-column">
+          <h1>Sistema Migratorio</h1>
+          <p>
+            Bienvenido al Sistema Web de Control Migratorio, plataforma para el
+            registro, consulta y seguimiento.
+          </p>
+        </section>
+
+        <section class="right-column">
+          <h2>Iniciar sesión</h2>
+
+          <form [formGroup]="form" (ngSubmit)="submit()" class="page-grid">
+            <div>
+              <label>Usuario</label>
+              <input
+                formControlName="run"
+                type="text"
+                placeholder="12.345.678-5"
+                autocomplete="username"
+                (input)="onRunInput($event)"
+              />
+            </div>
+
+            <div>
+              <label>Clave</label>
+              <div class="password-field">
+                <input
+                  formControlName="password"
+                  [type]="mostrarClave ? 'text' : 'password'"
+                  [appProgressivePasswordMask]="!mostrarClave"
+                  placeholder="••••••••"
+                  autocomplete="current-password"
+                />
+                <button
+                  type="button"
+                  class="toggle-password"
+                  (click)="toggleMostrarClave()"
+                >
+                  {{ mostrarClave ? 'Ocultar' : 'Mostrar' }}
+                </button>
+              </div>
+            </div>
+
+            <label class="remember-row">
+              <input type="checkbox" formControlName="recordar" />
+              <span>Recordar sesión en este equipo</span>
+            </label>
+
+            <button class="btn-login" [disabled]="loading">
+              {{ loading ? 'Ingresando...' : 'Ingresar' }}
+            </button>
+          </form>
+
+          <div class="demo-access" *ngIf="perfilesDemo.length > 0">
+            <div class="demo-access__header">
+              <div>
+                <span>Accesos rápidos</span>
+                <strong>Perfiles de desarrollo</strong>
+              </div>
+            </div>
+
+            <div class="demo-grid">
+              <button
+                type="button"
+                class="demo-profile"
+                *ngFor="let perfil of perfilesDemo"
+                [disabled]="loading"
+                (click)="ingresarComoDemo(perfil)"
+              >
+                <span>{{ perfil.titulo }}</span>
+                <small>{{ perfil.detalle }}</small>
+                <em>{{ perfil.run }}</em>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div
+        class="modal-overlay"
+        *ngIf="modalErrorAbierto"
+        (click)="cerrarModalError()"
+      >
+        <div class="modal-content" (click)="$event.stopPropagation()">
+          <h3>Acceso no válido</h3>
+          <p>{{ modalErrorMensaje }}</p>
+          <button type="button" class="btn-modal" (click)="cerrarModalError()">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  

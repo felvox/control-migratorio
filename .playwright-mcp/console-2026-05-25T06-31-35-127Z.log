@@ -1,0 +1,3 @@
+[      49ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[     143ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63940
+[     173ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0

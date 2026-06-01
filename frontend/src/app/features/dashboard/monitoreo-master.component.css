@@ -1,0 +1,139 @@
+.monitor-grid {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.filters-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.filters-head h3 {
+  margin: 0;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.58rem;
+}
+
+.kpi {
+  position: relative;
+  border: 1px solid #d7e1eb;
+  border-radius: 12px;
+  padding: 0.48rem 0.58rem;
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  grid-template-areas:
+    'icon label'
+    'icon value';
+  align-items: center;
+  column-gap: 0.45rem;
+  row-gap: 0.08rem;
+  background: #fff;
+}
+
+.kpi::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 0 0 12px 12px;
+}
+
+.kpi-icon {
+  grid-area: icon;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.kpi-icon-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
+.kpi-icon-logo--carabineros {
+  transform: scale(1.02);
+}
+
+.kpi-icon-logo--pdi {
+  transform: scale(1.08);
+}
+
+.kpi-label {
+  grid-area: label;
+  color: #607489;
+  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1.08;
+}
+
+.kpi strong {
+  grid-area: value;
+  color: #1f2f3f;
+  font-size: 1.85rem;
+  line-height: 1;
+}
+
+.kpi-value-text {
+  font-size: 1.1rem !important;
+  line-height: 1.1;
+  word-break: break-word;
+}
+
+.kpi-blue .kpi-icon,
+.kpi-blue::after {
+  background: #3b82f6;
+}
+
+.kpi-yellow .kpi-icon,
+.kpi-yellow::after {
+  background: #f59e0b;
+}
+
+.kpi-teal .kpi-icon,
+.kpi-teal::after {
+  background: #14b8a6;
+}
+
+.kpi-indigo .kpi-icon,
+.kpi-indigo::after {
+  background: #4f46e5;
+}
+
+.kpi-sky .kpi-icon,
+.kpi-sky::after {
+  background: #0ea5e9;
+}
+
+.kpi-green .kpi-icon,
+.kpi-green::after {
+  background: #22c55e;
+}
+
+.kpi-orange .kpi-icon,
+.kpi-orange::after {
+  background: #f97316;
+}
+
+.kpi-emerald .kpi-icon,
+.kpi-emerald::after {
+  background: #10b981;
+}
+
+.kpi-purple .kpi-icon,
+.kpi-purple::after {
+  background: #8b5cf6;
+}

@@ -1,0 +1,622 @@
+    <div class="page-grid caso-form-shell">
+      <form [formGroup]="form" (ngSubmit)="guardar()" class="page-grid">
+        <article class="card acta-sheet">
+          <header class="sheet-header">
+            <div class="identidad-block">
+              <strong>REPÚBLICA DE CHILE</strong>
+              <span>JAF “TARAPACÁ”</span>
+              <span>Puesto Mando FT “Tarapacá 76”</span>
+            </div>
+
+            <div class="titulo-block">
+              <h3>ACTA DE CONTROL MIGRATORIO</h3>
+              <div class="titulo-meta">
+                <span class="formato-pill" [class.formato-pill-menor]="esActaConMenor">
+                  {{ esActaConMenor ? 'Formato con menor de edad' : 'Formato mayor de edad' }}
+                </span>
+                <button
+                  *ngIf="!modoEdicion && pasoActual === 'procedimiento'"
+                  type="button"
+                  class="btn-secondary btn-sm"
+                  (click)="abrirModalTipoActa()"
+                >
+                  Cambiar acta
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <nav class="wizard-steps" aria-label="Progreso del formulario">
+            <button
+              *ngFor="let paso of pasosVisibles; let i = index"
+              type="button"
+              class="wizard-step"
+              [class.wizard-step-active]="pasoActual === paso.clave"
+              [class.wizard-step-done]="i < pasoActualIndex"
+              (click)="irAPaso(i)"
+            >
+              <span class="wizard-step-index">{{ i < pasoActualIndex ? '✓' : i + 1 }}</span>
+              <span class="wizard-step-title">{{ paso.titulo }}</span>
+            </button>
+          </nav>
+
+          <section class="sheet-section" *ngIf="pasoActual === 'procedimiento'">
+            <h4>1. DATOS DEL PROCEDIMIENTO</h4>
+
+            <div class="control-radio-grid">
+              <label class="control-option" [class.control-option-active]="form.get('tipoControl')?.value === 'INGRESO'">
+                <input type="radio" formControlName="tipoControl" value="INGRESO" />
+                <span>INGRESANDO A TERRITORIO NACIONAL</span>
+              </label>
+
+              <label class="control-option" [class.control-option-active]="form.get('tipoControl')?.value === 'EGRESO'">
+                <input type="radio" formControlName="tipoControl" value="EGRESO" />
+                <span>EGRESANDO DE TERRITORIO NACIONAL</span>
+              </label>
+            </div>
+
+            <p class="procedimiento-texto">
+              En <strong>{{ lugarProcedimientoTexto }}</strong>, a las
+              <strong>{{ horaProcedimientoTexto }}</strong> hrs. del día
+              <strong>{{ diaProcedimientoTexto }}</strong> del mes de
+              <strong>{{ mesProcedimientoTexto }}</strong> del año
+              <strong>{{ anioProcedimientoTexto }}</strong>, se inicia el procedimiento de control.
+            </p>
+
+            <div class="form-grid">
+              <div>
+                <label>Fecha y hora del procedimiento</label>
+                <input type="datetime-local" formControlName="fechaHoraProcedimiento" />
+              </div>
+
+              <div>
+                <label>Lugar</label>
+                <input formControlName="lugar" />
+              </div>
+
+              <div>
+                <label>Coordenadas (opcional)</label>
+                <input formControlName="coordenadas" placeholder="Ej: -18.4783,-70.3126" />
+              </div>
+            </div>
+
+          </section>
+
+          <section class="sheet-section" *ngIf="pasoActual === 'antecedentes_personales'" formArrayName="personas">
+            <h4>2. ANTECEDENTES PERSONALES</h4>
+
+            <article class="persona-card" [formGroupName]="indicePersonaPrincipal">
+              <div class="persona-header">
+                <strong>ANTECEDENTES PERSONALES</strong>
+              </div>
+
+              <div class="form-grid persona-form-grid">
+                <div>
+                  <label>Nombres</label>
+                  <input formControlName="nombres" />
+                </div>
+
+                <div>
+                  <label>Apellidos</label>
+                  <input formControlName="apellidos" />
+                </div>
+
+                <div>
+                  <label>Nacionalidad</label>
+                  <select formControlName="nacionalidad">
+                    <option value="">Seleccionar nacionalidad</option>
+                    <option *ngFor="let nacionalidad of nacionalidadesFrecuentes" [value]="nacionalidad">
+                      {{ nacionalidad }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label>Lugar de nacimiento</label>
+                  <input formControlName="lugarNacimiento" />
+                </div>
+
+                <div>
+                  <label>Fecha de nacimiento</label>
+                  <input
+                    type="date"
+                    formControlName="fechaNacimiento"
+                    [min]="fechaNacimientoMinMayorIso"
+                    [max]="fechaNacimientoMaxMayorIso"
+                    (change)="actualizarEdad(indicePersonaPrincipal)"
+                  />
+                </div>
+
+                <div>
+                  <label>EDAD</label>
+                  <input type="number" formControlName="edad" />
+                </div>
+
+                <div>
+                  <label>C.I. / DNI / PASAPORTE</label>
+                  <input formControlName="numeroDocumento" />
+                </div>
+
+                <div>
+                  <label>Profesión u oficio</label>
+                  <input formControlName="profesionOficio" />
+                </div>
+
+                <div>
+                  <label>Estado civil</label>
+                  <select formControlName="estadoCivil">
+                    <option value="">Seleccionar estado civil</option>
+                    <option *ngFor="let estado of estadosCiviles" [value]="estado">
+                      {{ estado }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label>Domicilio</label>
+                  <input formControlName="domicilio" />
+                </div>
+
+                <div>
+                  <label>Correo electrónico</label>
+                  <input formControlName="correo" />
+                </div>
+
+                <div>
+                  <label>Teléfono</label>
+                  <input formControlName="telefono" />
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="sheet-section" *ngIf="pasoActual === 'antecedentes_menor'" formArrayName="personas">
+            <div class="section-header">
+              <h4>3. ANTECEDENTES DE MENOR</h4>
+              <button type="button" class="btn-secondary btn-sm" (click)="agregarMenor()">
+                Agregar menor
+              </button>
+            </div>
+
+            <article
+              class="persona-card persona-card-menor"
+              *ngFor="let indiceMenor of indicesPersonasMenores; let orden = index"
+              [formGroupName]="indiceMenor"
+            >
+              <div class="persona-header">
+                <strong>ANTECEDENTES DE MENOR {{ orden + 1 }}</strong>
+                <button
+                  type="button"
+                  class="btn-danger btn-sm"
+                  *ngIf="puedeEliminarMenor"
+                  (click)="eliminarMenor(indiceMenor)"
+                >
+                  Quitar
+                </button>
+              </div>
+
+              <div class="form-grid persona-form-grid">
+                <div>
+                  <label>Nombres</label>
+                  <input formControlName="nombres" />
+                </div>
+
+                <div>
+                  <label>Apellidos</label>
+                  <input formControlName="apellidos" />
+                </div>
+
+                <div>
+                  <label>F./Nacimiento</label>
+                  <input
+                    type="date"
+                    formControlName="fechaNacimiento"
+                    [min]="fechaNacimientoMinMenorIso"
+                    [max]="fechaNacimientoMaxMenorIso"
+                    (change)="actualizarEdad(indiceMenor)"
+                  />
+                </div>
+
+                <div>
+                  <label>Nacionalidad</label>
+                  <select formControlName="nacionalidad">
+                    <option value="">Seleccionar nacionalidad</option>
+                    <option *ngFor="let nacionalidad of nacionalidadesFrecuentes" [value]="nacionalidad">
+                      {{ nacionalidad }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label>Ciudad de origen</label>
+                  <input formControlName="lugarNacimiento" />
+                </div>
+
+                <div>
+                  <label>Acta Nac. o ced. Id.</label>
+                  <input formControlName="numeroDocumento" />
+                </div>
+
+                <div>
+                  <label>Edad</label>
+                  <input type="number" formControlName="edad" min="0" max="18" readonly />
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="sheet-section" *ngIf="pasoActual === 'antecedentes_migratorios'">
+            <h4>{{ esActaConMenor ? '4' : '3' }}. ANTECEDENTES MIGRATORIOS</h4>
+
+            <div class="migratorio-grid">
+              <div class="migratorio-item">
+                <label>Fecha de ingreso</label>
+                <input type="date" formControlName="fechaIngreso" />
+              </div>
+
+              <div class="radio-field migratorio-item">
+                <label>Documentado</label>
+                <div class="radio-group radio-group-compact">
+                  <label
+                    class="radio-chip"
+                    [class.radio-chip-active]="form.get('documentado')?.value === true"
+                  >
+                    <input type="radio" formControlName="documentado" [value]="true" />
+                    <span>Sí</span>
+                  </label>
+                  <label
+                    class="radio-chip"
+                    [class.radio-chip-active]="form.get('documentado')?.value === false"
+                  >
+                    <input type="radio" formControlName="documentado" [value]="false" />
+                    <span>No</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="radio-field migratorio-item">
+                <label>Presenta lesiones</label>
+                <div class="radio-group radio-group-compact">
+                  <label
+                    class="radio-chip"
+                    [class.radio-chip-active]="form.get('presentaLesiones')?.value === true"
+                  >
+                    <input type="radio" formControlName="presentaLesiones" [value]="true" />
+                    <span>Sí</span>
+                  </label>
+                  <label
+                    class="radio-chip"
+                    [class.radio-chip-active]="form.get('presentaLesiones')?.value === false"
+                  >
+                    <input type="radio" formControlName="presentaLesiones" [value]="false" />
+                    <span>No</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="migratorio-item migratorio-item-salud">
+                <label>Estado de salud (detalle)</label>
+                <input formControlName="estadoSalud" [placeholder]="placeholderEstadoSalud" />
+              </div>
+            </div>
+          </section>
+
+          <section class="sheet-section" *ngIf="pasoActual === 'evidencias'">
+            <div class="section-header">
+              <h4>{{ esActaConMenor ? '5' : '4' }}. EVIDENCIAS</h4>
+              <button type="button" class="btn-secondary" (click)="agregarEvidencia()">
+                Agregar evidencia
+              </button>
+            </div>
+
+            <p class="hint-text">Formatos permitidos: JPG, JPEG, PNG y PDF. Tamaño máximo {{ maxUploadMb }} MB.</p>
+
+            <div class="evidencias-existentes" *ngIf="evidenciasExistentes.length > 0">
+              <h5>Evidencias cargadas en el caso</h5>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tipo</th>
+                      <th>Archivo</th>
+                      <th>Fecha</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let evidencia of evidenciasExistentes">
+                      <td>{{ etiquetaTipoEvidencia(evidencia.tipoEvidencia) }}</td>
+                      <td>{{ evidencia.nombreOriginal }}</td>
+                      <td>{{ evidencia.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                      <td>
+                        <button type="button" class="btn-secondary btn-sm" (click)="descargarEvidencia(evidencia)">
+                          Descargar
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <p class="hint-text" *ngIf="evidenciasFormArray.length === 0 && evidenciasExistentes.length === 0">
+              No has agregado evidencias aún.
+            </p>
+
+            <div class="evidencias-grid" *ngIf="evidenciasFormArray.length > 0">
+              <article class="evidencia-card" *ngFor="let evidencia of evidenciasFormArray.controls; let i = index" [formGroup]="evidenciaFormAt(i)">
+                <div class="form-grid evidencia-form-grid">
+                  <div>
+                    <label>Tipo de evidencia</label>
+                    <select formControlName="tipoEvidencia">
+                      <option value="FOTO_PERSONA">Foto persona</option>
+                      <option value="DOCUMENTO_IDENTIDAD">Documento identidad</option>
+                      <option value="ADJUNTO_GENERAL">Adjunto general</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label>
+                      Persona asociada
+                      {{ tipoEvidenciaRequierePersona(evidenciaFormAt(i).get('tipoEvidencia')?.value) ? '(obligatoria)' : '(opcional)' }}
+                    </label>
+                    <select formControlName="personaRef">
+                      <option value="" *ngIf="!tipoEvidenciaRequierePersona(evidenciaFormAt(i).get('tipoEvidencia')?.value)">
+                        Sin persona
+                      </option>
+                      <option *ngFor="let index of indicesTodasLasPersonas" [value]="index">
+                        {{ personaEtiqueta(index) }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label>Archivo</label>
+                    <input type="file" accept=".jpg,.jpeg,.png,.pdf" (change)="onArchivoEvidenciaChange($event, i)" />
+                  </div>
+                </div>
+
+                <p class="hint-text" *ngIf="evidenciaFormAt(i).get('archivoNombre')?.value">
+                  Archivo: {{ evidenciaFormAt(i).get('archivoNombre')?.value }}
+                </p>
+
+                <div class="evidencia-preview" *ngIf="evidenciaFormAt(i).get('previewUrl')?.value as previewUrl">
+                  <img
+                    *ngIf="evidenciaFormAt(i).get('previewEsImagen')?.value"
+                    [src]="previewUrl"
+                    alt="Vista previa evidencia"
+                  />
+
+                  <div class="pdf-preview" *ngIf="evidenciaFormAt(i).get('previewEsPdf')?.value">
+                    <span>PDF seleccionado</span>
+                    <button type="button" class="btn-secondary btn-sm" (click)="abrirPreviewArchivo(previewUrl)">
+                      Ver archivo
+                    </button>
+                  </div>
+                </div>
+
+                <div class="evidencia-actions">
+                  <button type="button" class="btn-danger" (click)="eliminarEvidencia(i)">
+                    Quitar evidencia
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="sheet-section" *ngIf="pasoActual === 'observaciones'">
+            <h4>{{ esActaConMenor ? '6' : '5' }}. OBSERVACIONES Y TOMA DE CONOCIMIENTO</h4>
+
+            <div class="observaciones-field">
+              <div class="observaciones-actions" *ngIf="!tieneObservaciones">
+                <button type="button" class="btn-secondary" (click)="abrirModalObservaciones()">
+                  Agregar observaciones
+                </button>
+              </div>
+
+              <div class="observaciones-actions" *ngIf="tieneObservaciones">
+                <button type="button" class="btn-secondary" (click)="editarObservaciones()">
+                  Editar observaciones
+                </button>
+                <button type="button" class="btn-danger" (click)="eliminarObservaciones()">
+                  Eliminar
+                </button>
+              </div>
+
+              <div class="observaciones-preview" *ngIf="tieneObservaciones">
+                {{ form.get('observaciones')?.value }}
+              </div>
+            </div>
+
+            <div class="conocimiento-box">
+              <p class="conocimiento-texto">
+                TOMA DE CONOCIMIENTO BAJO CONFORMIDAD, SEGÚN PROTOCOLO DE CONTROL MIGRATORIO.
+              </p>
+
+              <label class="radio-chip check-chip" [class.radio-chip-active]="form.get('tomaConocimiento')?.value === true">
+                <input type="checkbox" formControlName="tomaConocimiento" />
+                <span>Confirmo toma de conocimiento y conformidad del procedimiento.</span>
+              </label>
+
+              <div class="form-grid">
+                <div>
+                  <label>ID funcionario</label>
+                  <input [value]="authService.currentUser?.id || 'Sin sesión'" readonly />
+                </div>
+                <div>
+                  <label>RUN funcionario</label>
+                  <input [value]="authService.currentUser?.run || 'Sin sesión'" readonly />
+                </div>
+                <div>
+                  <label>Funcionario responsable</label>
+                  <input [value]="authService.currentUser?.nombreCompleto || 'Sin sesión'" readonly />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="sheet-section" *ngIf="pasoActual === 'resumen'">
+            <h4>{{ esActaConMenor ? '7' : '6' }}. RESUMEN FINAL Y SALIDA DOCUMENTAL</h4>
+
+            <div class="resumen-grid">
+              <article class="resumen-card">
+                <label>Tipo de acta</label>
+                <strong>{{ esActaConMenor ? 'Con menor de edad' : 'Mayor de edad' }}</strong>
+              </article>
+
+              <article class="resumen-card">
+                <label>Total personas</label>
+                <strong>{{ totalPersonas }}</strong>
+              </article>
+
+              <article class="resumen-card" *ngIf="esActaConMenor">
+                <label>Total menores</label>
+                <strong>{{ totalMenoresDetectados }}</strong>
+              </article>
+
+              <article class="resumen-card">
+                <label>Evidencias preparadas</label>
+                <strong>{{ totalEvidenciasPreparadas }}</strong>
+              </article>
+
+              <article class="resumen-card">
+                <label>Derivación</label>
+                <strong>{{ derivacionAutomatica }}</strong>
+              </article>
+
+              <article class="resumen-card">
+                <label>Ruta</label>
+                <strong>{{ rutaProcedimiento }}</strong>
+              </article>
+            </div>
+
+          </section>
+        </article>
+
+        <div class="actions-row actions-row-wizard">
+          <button type="button" class="btn-secondary" (click)="anteriorPaso()" [disabled]="esPrimerPaso">
+            Anterior
+          </button>
+
+          <button
+            type="button"
+            class="btn-primary"
+            *ngIf="!esUltimoPaso"
+            (click)="siguientePaso()"
+          >
+            Siguiente
+          </button>
+
+          <button
+            type="button"
+            class="btn-primary"
+            *ngIf="esUltimoPaso"
+            [disabled]="guardando"
+            (click)="guardar('GUARDAR')"
+          >
+            {{ guardando ? 'Guardando...' : (modoEdicion ? 'Actualizar caso' : 'Guardar caso') }}
+          </button>
+
+          <button
+            type="button"
+            class="btn-secondary"
+            *ngIf="esUltimoPaso"
+            [disabled]="guardando"
+            (click)="guardar('GUARDAR_Y_PDF')"
+          >
+            {{ guardando ? 'Procesando...' : (modoEdicion ? 'Actualizar y descargar PDF' : 'Guardar y descargar PDF') }}
+          </button>
+
+          <button type="button" class="btn-secondary" (click)="volver()">
+            Cancelar
+          </button>
+        </div>
+      </form>
+
+      <div class="modal-backdrop" *ngIf="mostrarModalActa">
+        <section class="modal-card" role="dialog" aria-modal="true">
+          <h3>Seleccionar tipo de acta</h3>
+          <p class="modal-subtitle">
+            Elige el formato para adaptar el formulario según corresponda.
+          </p>
+
+          <div class="acta-selector-grid">
+            <button
+              type="button"
+              class="acta-option"
+              [class.acta-option-active]="tipoActaPendiente === 'MAYOR'"
+              (click)="seleccionarActaPendiente('MAYOR')"
+            >
+              <span class="acta-option-title">Mayor de edad</span>
+              <span class="acta-option-sub">Derivación directa a PDI</span>
+            </button>
+
+            <button
+              type="button"
+              class="acta-option"
+              [class.acta-option-active]="tipoActaPendiente === 'CON_MENOR'"
+              (click)="seleccionarActaPendiente('CON_MENOR')"
+            >
+              <span class="acta-option-title">Con menor de edad</span>
+              <span class="acta-option-sub">Derivación Carabineros y luego PDI</span>
+            </button>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="cancelarModalTipoActa()">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="btn-primary"
+              [disabled]="!tipoActaPendiente"
+              (click)="confirmarTipoActaDesdeModal()"
+            >
+              Continuar
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <div class="modal-backdrop" *ngIf="mostrarModalObservaciones">
+        <section class="modal-card observaciones-modal" role="dialog" aria-modal="true">
+          <h3>Observaciones del caso</h3>
+          <p class="modal-subtitle">
+            Registra observaciones relevantes del procedimiento.
+          </p>
+
+          <textarea
+            rows="6"
+            [value]="observacionTemporal"
+            (input)="actualizarObservacionTemporal($event)"
+            placeholder="Escribe aquí las observaciones..."
+          ></textarea>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" (click)="cerrarModalObservaciones()">
+              Cancelar
+            </button>
+            <button type="button" class="btn-primary" (click)="guardarObservacionesDesdeModal()">
+              Guardar
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <app-alert-modal
+        [open]="alertExitoAbierto"
+        title="Operación completada"
+        [message]="alertaExitoMensaje"
+        variant="success"
+        (accepted)="cerrarAlertaExito()"
+      />
+
+      <app-alert-modal
+        [open]="alertAvisoAbierto"
+        title="Aviso"
+        [message]="alertaAvisoMensaje"
+        variant="warning"
+        (accepted)="cerrarAlertaAviso()"
+      />
+    </div>
+  

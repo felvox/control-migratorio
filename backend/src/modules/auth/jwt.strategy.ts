@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MotivoCierreSesion } from '@prisma/client';
 
 interface JwtPayload {
   sub: string;
@@ -14,10 +15,11 @@ interface JwtPayload {
   sesionId?: string;
 }
 
-const SESSION_ACTIVITY_WINDOW_MINUTES = 30;
-
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private idleTimeoutMinutes: number;
+  private touchIntervalSeconds: number;
+
   constructor(
     configService: ConfigService,
     private readonly prisma: PrismaService,
@@ -27,6 +29,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('jwt.secret', 'dev_secret'),
     });
+
+    this.idleTimeoutMinutes = configService.get<number>(
+      'session.idleTimeoutMinutes',
+      30,
+    );
+    this.touchIntervalSeconds = configService.get<number>(
+      'session.touchIntervalSeconds',
+      60,
+    );
+
+    if (!Number.isFinite(this.idleTimeoutMinutes) || this.idleTimeoutMinutes <= 0) {
+      this.idleTimeoutMinutes = 30;
+    }
+
+    if (!Number.isFinite(this.touchIntervalSeconds) || this.touchIntervalSeconds <= 0) {
+      this.touchIntervalSeconds = 60;
+    }
   }
 
   async validate(payload: JwtPayload) {
@@ -55,28 +74,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     if (
-      (['OPERADOR', 'CONSULTA'].includes(user.rol) ||
+      (['OPERADOR', 'CONSULTA', 'CARABINEROS', 'PDI'].includes(user.rol) ||
         (user.rol === 'ADMINISTRADOR' && !user.esMaster)) &&
       !user.jaf
     ) {
       throw new UnauthorizedException('Usuario sin JAF asignada');
     }
 
-    const limiteSesionActiva = new Date(
-      Date.now() - SESSION_ACTIVITY_WINDOW_MINUTES * 60 * 1000,
-    );
-
     const sesionActiva = await this.prisma.sesionAcceso.findFirst({
       where: {
         id: payload.sesionId,
         usuarioId: user.id,
         cierreSesion: null,
-        inicioSesion: {
-          gte: limiteSesionActiva,
-        },
       },
       select: {
         id: true,
+        inicioSesion: true,
+        ultimaActividadAt: true,
       },
     });
 
@@ -84,14 +98,35 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Sesión expirada');
     }
 
-    await this.prisma.sesionAcceso.update({
-      where: {
-        id: payload.sesionId,
-      },
-      data: {
-        inicioSesion: new Date(),
-      },
-    });
+    const ultimaActividad = sesionActiva.ultimaActividadAt ?? sesionActiva.inicioSesion;
+    const ahora = new Date();
+    const milisegundosInactividad =
+      ahora.getTime() - ultimaActividad.getTime();
+    const limiteInactividadMs = this.idleTimeoutMinutes * 60 * 1000;
+
+    if (milisegundosInactividad > limiteInactividadMs) {
+      await this.prisma.sesionAcceso.update({
+        where: { id: payload.sesionId },
+        data: {
+          cierreSesion: ahora,
+          motivoCierre: MotivoCierreSesion.INACTIVIDAD,
+        },
+      });
+
+      throw new UnauthorizedException('Sesión expirada por inactividad');
+    }
+
+    const touchIntervalMs = this.touchIntervalSeconds * 1000;
+    if (milisegundosInactividad >= touchIntervalMs) {
+      await this.prisma.sesionAcceso.update({
+        where: {
+          id: payload.sesionId,
+        },
+        data: {
+          ultimaActividadAt: ahora,
+        },
+      });
+    }
 
     return {
       id: user.id,

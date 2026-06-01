@@ -10,6 +10,7 @@ import { DocumentosModule } from './modules/documentos/documentos.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportesModule } from './modules/reportes/reportes.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AuditoriaModule } from './modules/auditoria/auditoria.module';
     DocumentosModule,
     DashboardModule,
     ReportesModule,
+    FeedbackModule,
   ],
 })
 export class AppModule {}

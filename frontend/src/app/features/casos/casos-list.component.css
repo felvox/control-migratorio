@@ -1,0 +1,40 @@
+      td:last-child {
+        display: flex;
+        gap: 0.4rem;
+      }
+
+      .case-status-badge {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        border-radius: 999px;
+        border: 1px solid #d5dde6;
+        background: #f3f6fa;
+        color: #415264;
+        padding: 0.24rem 0.66rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .case-status-badge.status-pendiente {
+        background: #fff1f3;
+        color: #9f3246;
+        border-color: #f2b8c2;
+      }
+
+      .case-status-badge.status-derivado-carabineros,
+      .case-status-badge.status-derivado-pdi {
+        background: #edf8f1;
+        color: #1f7a48;
+        border-color: #a8d8b8;
+      }
+
+      .case-status-badge.status-cerrado {
+        background: #eef4ff;
+        color: #254e9a;
+        border-color: #bfd2f5;
+      }
+    

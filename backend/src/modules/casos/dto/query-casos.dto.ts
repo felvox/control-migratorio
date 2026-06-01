@@ -1,7 +1,8 @@
-import { EstadoCaso, Jaf } from '@prisma/client';
+import { EstadoCaso, InstitucionDerivacion, Jaf } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -55,6 +56,15 @@ export class QueryCasosDto {
   @IsOptional()
   @IsEnum(Jaf)
   jaf?: Jaf;
+
+  @IsOptional()
+  @IsEnum(InstitucionDerivacion)
+  institucionDerivacion?: InstitucionDerivacion;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  existenMenores?: boolean;
 
   @IsOptional()
   @Type(() => Number)

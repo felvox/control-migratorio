@@ -15,6 +15,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../common/interfaces/auth-user.interface';
+import { obtenerIpCliente } from '../../common/utils/client-ip.util';
 import { DocumentosService } from './documentos.service';
 
 @Controller()
@@ -22,27 +23,52 @@ import { DocumentosService } from './documentos.service';
 export class DocumentosController {
   constructor(private readonly documentosService: DocumentosService) {}
 
+  private extraerMetaRequest(req: Request): { ip?: string; userAgent?: string } {
+    return {
+      ip: obtenerIpCliente(req),
+      userAgent:
+        typeof req.headers['user-agent'] === 'string'
+          ? req.headers['user-agent']
+          : undefined,
+    };
+  }
+
   @Post('casos/:id/documentos/pdf')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR)
+  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CARABINEROS)
   generarActa(
     @Param('id') casoId: string,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ) {
-    return this.documentosService.generarActaPdf(casoId, user, {
-      ip: req.ip,
-      userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
-    });
+    return this.documentosService.generarActaPdf(
+      casoId,
+      user,
+      this.extraerMetaRequest(req),
+    );
   }
 
   @Get('casos/:id/documentos')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
+  @Roles(
+    Role.ADMINISTRADOR,
+    Role.OPERADOR,
+    Role.CONSULTA,
+    Role.AUDITOR,
+    Role.CARABINEROS,
+    Role.PDI,
+  )
   listarPorCaso(@Param('id') casoId: string, @CurrentUser() user: AuthUser) {
     return this.documentosService.listarPorCaso(casoId, user);
   }
 
   @Get('documentos/:id/download')
-  @Roles(Role.ADMINISTRADOR, Role.OPERADOR, Role.CONSULTA, Role.AUDITOR)
+  @Roles(
+    Role.ADMINISTRADOR,
+    Role.OPERADOR,
+    Role.CONSULTA,
+    Role.AUDITOR,
+    Role.CARABINEROS,
+    Role.PDI,
+  )
   async descargar(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,

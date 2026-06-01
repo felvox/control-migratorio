@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
+import { SessionMaintenanceService } from './session-maintenance.service';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
     AuditoriaModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, SessionMaintenanceService],
   exports: [AuthService],
 })
 export class AuthModule {}

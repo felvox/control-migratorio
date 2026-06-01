@@ -21,6 +21,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../common/interfaces/auth-user.interface';
+import { obtenerIpCliente } from '../../common/utils/client-ip.util';
 import { Role } from '@prisma/client';
 
 @Controller('usuarios')
@@ -36,7 +37,7 @@ export class UsuariosController {
     @Req() req: Request,
   ) {
     return this.usuariosService.crear(dto, actor, {
-      ip: req.ip,
+      ip: obtenerIpCliente(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
   }
@@ -59,7 +60,7 @@ export class UsuariosController {
     @Req() req: Request,
   ) {
     return this.usuariosService.actualizar(id, dto, actor, {
-      ip: req.ip,
+      ip: obtenerIpCliente(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
   }
@@ -71,7 +72,7 @@ export class UsuariosController {
     @Req() req: Request,
   ) {
     return this.usuariosService.desactivar(id, actor, {
-      ip: req.ip,
+      ip: obtenerIpCliente(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
   }
@@ -83,7 +84,7 @@ export class UsuariosController {
     @Req() req: Request,
   ) {
     return this.usuariosService.activar(id, actor, {
-      ip: req.ip,
+      ip: obtenerIpCliente(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
   }
@@ -96,7 +97,7 @@ export class UsuariosController {
     @Req() req: Request,
   ) {
     return this.usuariosService.resetearPassword(id, dto, actor, {
-      ip: req.ip,
+      ip: obtenerIpCliente(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
   }
@@ -108,7 +109,7 @@ export class UsuariosController {
     @Req() req: Request,
   ) {
     return this.usuariosService.eliminarLogico(id, actor, {
-      ip: req.ip,
+      ip: obtenerIpCliente(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined,
     });
   }

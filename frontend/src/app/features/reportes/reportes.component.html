@@ -1,0 +1,157 @@
+<div class="reportes-backdrop" *ngIf="modalSelectorTipoAbierto" (click)="cancelarSelectorTipo()">
+  <section class="selector-modal" (click)="$event.stopPropagation()">
+    <header class="selector-head">
+      <h3>Selecciona tipo de reporte</h3>
+      <p>Reportes simples por estado del flujo institucional.</p>
+    </header>
+    <div class="selector-actions">
+      <button
+        type="button"
+        class="btn-selector btn-selector-creados"
+        (click)="seleccionarTipoReporte('casos-creados')"
+      >
+        <span class="selector-index">01</span>
+        <span class="selector-copy">
+          <strong>Casos creados</strong>
+          <span>Todos los casos creados.</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        class="btn-selector btn-selector-carabineros"
+        (click)="seleccionarTipoReporte('casos-carabineros')"
+      >
+        <span class="selector-index">02</span>
+        <span class="selector-copy">
+          <strong>Casos Carabineros</strong>
+          <span>Casos actualmente derivados a Carabineros.</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        class="btn-selector btn-selector-pdi"
+        (click)="seleccionarTipoReporte('casos-pdi')"
+      >
+        <span class="selector-index">03</span>
+        <span class="selector-copy">
+          <strong>Casos PDI</strong>
+          <span>Casos actualmente derivados a PDI.</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        class="btn-selector btn-selector-cerrado"
+        (click)="seleccionarTipoReporte('casos-cerrados')"
+      >
+        <span class="selector-index">04</span>
+        <span class="selector-copy">
+          <strong>Casos cerrados</strong>
+          <span>Casos finalizados por PDI y cerrados en sistema.</span>
+        </span>
+      </button>
+    </div>
+  </section>
+</div>
+
+<div class="page-grid" *ngIf="!modalSelectorTipoAbierto">
+  <article class="card reportes-card">
+    <header class="reportes-head">
+      <div>
+        <h3>Reporte: {{ etiquetaTipoReporteSeleccionado }}</h3>
+        <p>Aplica filtros principales y valida la vista previa antes de exportar.</p>
+      </div>
+      <button class="btn-secondary" type="button" (click)="abrirSelectorTipo()">
+        Cambiar tipo de reporte
+      </button>
+    </header>
+
+    <form [formGroup]="filtrosForm" class="form-grid reportes-grid">
+      <div>
+        <label>Fecha desde</label>
+        <input type="date" formControlName="fechaDesde" />
+      </div>
+
+      <div>
+        <label>Fecha hasta</label>
+        <input type="date" formControlName="fechaHasta" />
+      </div>
+
+      <div>
+        <label>JAF</label>
+        <select formControlName="jaf">
+          <option value="">Todas las JAF</option>
+          <option value="TARAPACA">JAF Tarapacá</option>
+          <option value="ANTOFAGASTA">JAF Antofagasta</option>
+          <option value="ARICA_PARINACOTA">JAF Arica y Parinacota</option>
+        </select>
+        <small *ngIf="esAdminOperativo" class="hint-jaf">
+          Administrador operativo: reporte restringido a tu JAF.
+        </small>
+      </div>
+
+      <div>
+        <label>Tipo de control</label>
+        <select formControlName="tipoControl">
+          <option value="">Todos</option>
+          <option value="INGRESO">Ingreso</option>
+          <option value="EGRESO">Egreso</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Con menores</label>
+        <select formControlName="conMenores">
+          <option value="">Todos</option>
+          <option value="true">Sí</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+    </form>
+
+    <div class="reportes-actions">
+      <button class="btn-secondary" type="button" (click)="limpiarFiltros()">
+        Limpiar filtros
+      </button>
+      <button class="btn-primary" type="button" (click)="exportarExcel()">
+        Exportar Excel
+      </button>
+      <button class="btn-secondary" type="button" (click)="exportarPdf()">
+        Exportar PDF
+      </button>
+    </div>
+
+    <section class="preview-box">
+      <div class="preview-head">
+        <h4>Vista previa</h4>
+        <span *ngIf="preview && !cargandoPreview">
+          Mostrando {{ preview.filas.length }} de {{ preview.total }} registro(s)
+        </span>
+      </div>
+
+      <p class="preview-loading" *ngIf="cargandoPreview">Cargando vista previa...</p>
+      <p class="preview-loading" *ngIf="!cargandoPreview && errorVistaPrevia">
+        {{ errorVistaPrevia }}
+      </p>
+
+      <div class="preview-table" *ngIf="preview && !cargandoPreview">
+        <table>
+          <thead>
+            <tr>
+              <th *ngFor="let col of preview.columnas">{{ col }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let fila of preview.filas">
+              <td *ngFor="let valor of fila">{{ valor }}</td>
+            </tr>
+            <tr *ngIf="!preview.filas.length">
+              <td [attr.colspan]="preview.columnas.length" class="empty-cell">
+                No hay registros con estos filtros.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </article>
+</div>

@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import {
   EstadoCaso,
   InstitucionDerivacion,
+  Jaf,
   Prisma,
   Role,
   TipoControl,
@@ -79,6 +80,165 @@ export class DashboardService {
     return { jaf: user.jaf };
   }
 
+  private parsearFechaInicio(fecha?: string): Date | null {
+    if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return null;
+    }
+
+    const parsed = new Date(`${fecha}T00:00:00.000`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private parsearFechaFin(fecha?: string): Date | null {
+    if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return null;
+    }
+
+    const parsed = new Date(`${fecha}T23:59:59.999`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  async resumenMonitoreoMaster(
+    user: AuthUser,
+    query?: { fechaDesde?: string; fechaHasta?: string; jaf?: string },
+  ) {
+    if (!user.esMaster) {
+      throw new ForbiddenException(
+        'Solo el Administrador Master puede acceder al monitoreo general.',
+      );
+    }
+
+    const fechaDesde = this.parsearFechaInicio(query?.fechaDesde);
+    const fechaHasta = this.parsearFechaFin(query?.fechaHasta);
+    const jafFiltro =
+      query?.jaf && ['TARAPACA', 'ANTOFAGASTA', 'ARICA_PARINACOTA'].includes(query.jaf)
+        ? (query.jaf as Jaf)
+        : null;
+
+    const whereBase: Prisma.CasoWhereInput = {
+      eliminadoAt: null,
+      jaf: jafFiltro ?? undefined,
+      fechaHoraProcedimiento:
+        fechaDesde || fechaHasta
+          ? {
+              gte: fechaDesde ?? undefined,
+              lte: fechaHasta ?? undefined,
+            }
+          : undefined,
+    };
+
+    const construirWhereJaf = (jaf: Jaf): Prisma.CasoWhereInput => ({
+      ...whereBase,
+      jaf,
+    });
+
+    const contarTotales = async (where: Prisma.CasoWhereInput) => {
+      const [
+        creados,
+        pendientes,
+        derivadosCarabineros,
+        derivadosPdi,
+        porRevisarCarabineros,
+        porRevisarPdi,
+        cerrados,
+        noDocumentados,
+        conMenores,
+      ] = await Promise.all([
+        this.prisma.caso.count({ where }),
+        this.prisma.caso.count({
+          where: { ...where, estado: EstadoCaso.PENDIENTE },
+        }),
+        this.prisma.caso.count({
+          where: { ...where, estado: EstadoCaso.DERIVADO_CARABINEROS },
+        }),
+        this.prisma.caso.count({
+          where: { ...where, estado: EstadoCaso.DERIVADO_PDI },
+        }),
+        this.prisma.caso.count({
+          where: {
+            ...where,
+            estado: EstadoCaso.DERIVADO_CARABINEROS,
+            institucionDerivacion: InstitucionDerivacion.CARABINEROS,
+          },
+        }),
+        this.prisma.caso.count({
+          where: {
+            ...where,
+            estado: EstadoCaso.DERIVADO_PDI,
+            institucionDerivacion: InstitucionDerivacion.PDI,
+          },
+        }),
+        this.prisma.caso.count({
+          where: { ...where, estado: EstadoCaso.CERRADO },
+        }),
+        this.prisma.caso.count({
+          where: { ...where, documentado: false },
+        }),
+        this.prisma.caso.count({
+          where: { ...where, existenMenores: true },
+        }),
+      ]);
+
+      return {
+        creados,
+        pendientes,
+        derivadosCarabineros,
+        derivadosPdi,
+        porRevisarCarabineros,
+        porRevisarPdi,
+        cerrados,
+        noDocumentados,
+        conMenores,
+      };
+    };
+
+    const [totales, tarapaca, antofagasta, aricaParinacota] = await Promise.all([
+      contarTotales(whereBase),
+      contarTotales(construirWhereJaf(Jaf.TARAPACA)),
+      contarTotales(construirWhereJaf(Jaf.ANTOFAGASTA)),
+      contarTotales(construirWhereJaf(Jaf.ARICA_PARINACOTA)),
+    ]);
+
+    const nacionalidadTop = await this.prisma.persona.groupBy({
+      by: ['nacionalidad'],
+      where: {
+        tipoPersona: TipoPersona.PRINCIPAL,
+        caso: whereBase,
+      },
+      _count: {
+        nacionalidad: true,
+      },
+      orderBy: {
+        _count: {
+          nacionalidad: 'desc',
+        },
+      },
+      take: 1,
+    });
+
+    const top = nacionalidadTop[0];
+    const nacionalidadTopResumen = {
+      nacionalidad: (top?.nacionalidad ?? '').trim() || 'Sin registro',
+      total: top?._count?.nacionalidad ?? 0,
+    };
+
+    return {
+      generadoAt: new Date().toISOString(),
+      filtros: {
+        fechaDesde: query?.fechaDesde ?? null,
+        fechaHasta: query?.fechaHasta ?? null,
+        jaf: jafFiltro ?? 'TODAS',
+      },
+      totales,
+      nacionalidadTop: nacionalidadTopResumen,
+      porJaf: [
+        { jaf: Jaf.TARAPACA, ...tarapaca },
+        { jaf: Jaf.ANTOFAGASTA, ...antofagasta },
+        { jaf: Jaf.ARICA_PARINACOTA, ...aricaParinacota },
+      ],
+    };
+  }
+
   async resumenAdministrador(user: AuthUser, fecha?: string) {
     const fechaBase = this.resolverFechaBase(fecha);
     const filtroJaf = this.resolverFiltroJaf(user);
@@ -150,16 +310,20 @@ export class DashboardService {
       casosPorTipoControl,
       casosPorDerivacion,
       casosPorDocumentado,
+      casosPorDocumentadoDia,
       casosPorMenores,
       estadoPorDocumentado,
       topUbicaciones,
       totalCasosConLesiones,
+      totalCasosConLesionesDia,
       totalCasosCerrados,
+      totalCasosCerradosDia,
       totalCasosSinCierre,
       totalCasosConMenorPendiente,
       topNacionalidades,
       totalPersonas,
       totalPersonasMenores,
+      totalPersonasMenoresDia,
     ] =
       await Promise.all([
         this.prisma.caso.count({
@@ -253,6 +417,13 @@ export class DashboardService {
           },
         }),
         this.prisma.caso.groupBy({
+          by: ['documentado'],
+          where: whereDia,
+          _count: {
+            documentado: true,
+          },
+        }),
+        this.prisma.caso.groupBy({
           by: ['existenMenores'],
           where: whereHastaFecha,
           _count: {
@@ -334,7 +505,66 @@ export class DashboardService {
         }),
         this.prisma.caso.count({
           where: {
+            ...whereDia,
+            AND: [
+              {
+                OR: [
+                  {
+                    estadoSalud: {
+                      contains: 'lesion',
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    estadoSalud: {
+                      contains: 'lesión',
+                      mode: 'insensitive',
+                    },
+                  },
+                ],
+              },
+              {
+                NOT: {
+                  OR: [
+                    {
+                      estadoSalud: {
+                        contains: 'sin lesion',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      estadoSalud: {
+                        contains: 'sin lesión',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      estadoSalud: {
+                        contains: 'no presenta lesion',
+                        mode: 'insensitive',
+                      },
+                    },
+                    {
+                      estadoSalud: {
+                        contains: 'no presenta lesión',
+                        mode: 'insensitive',
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        }),
+        this.prisma.caso.count({
+          where: {
             ...whereHastaFecha,
+            estado: EstadoCaso.CERRADO,
+          },
+        }),
+        this.prisma.caso.count({
+          where: {
+            ...whereDia,
             estado: EstadoCaso.CERRADO,
           },
         }),
@@ -385,6 +615,23 @@ export class DashboardService {
           where: {
             caso: {
               ...whereHastaFecha,
+            },
+            OR: [
+              {
+                tipoPersona: TipoPersona.MENOR,
+              },
+              {
+                edad: {
+                  lt: 18,
+                },
+              },
+            ],
+          },
+        }),
+        this.prisma.persona.count({
+          where: {
+            caso: {
+              ...whereDia,
             },
             OR: [
               {
@@ -451,6 +698,9 @@ export class DashboardService {
     const documentadoNo =
       casosPorDocumentado.find((item) => !item.documentado)?._count.documentado ??
       0;
+    const documentadoNoDia =
+      casosPorDocumentadoDia.find((item) => !item.documentado)?._count
+        .documentado ?? 0;
 
     const conMenores =
       casosPorMenores.find((item) => item.existenMenores)?._count
@@ -519,10 +769,10 @@ export class DashboardService {
       },
       metricasOperativas: {
         actasHoy: totalDia,
-        menoresEdad: totalPersonasMenores,
-        noDocumentados: documentadoNo,
-        conLesiones: totalCasosConLesiones,
-        casosCerrados: totalCasosCerrados,
+        menoresEdad: totalPersonasMenoresDia,
+        noDocumentados: documentadoNoDia,
+        conLesiones: totalCasosConLesionesDia,
+        casosCerrados: totalCasosCerradosDia,
       },
       alertas: {
         menoresPendientes: totalCasosConMenorPendiente,

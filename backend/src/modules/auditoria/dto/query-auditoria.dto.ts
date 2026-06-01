@@ -1,6 +1,15 @@
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { Jaf } from '@prisma/client';
+import { Jaf, Role } from '@prisma/client';
 
 export class QueryAuditoriaDto {
   @IsOptional()
@@ -20,12 +29,28 @@ export class QueryAuditoriaDto {
   entidades?: string;
 
   @IsOptional()
+  @IsDateString()
+  fechaDesde?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaHasta?: string;
+
+  @IsOptional()
   @IsEnum(Jaf)
   jaf?: Jaf;
 
   @IsOptional()
   @IsString()
   usuarioId?: string;
+
+  @IsOptional()
+  @IsEnum(Role)
+  rol?: Role;
+
+  @IsOptional()
+  @IsIn(['ACTIVOS', 'DESCONECTADOS'])
+  estadoConexion?: 'ACTIVOS' | 'DESCONECTADOS';
 
   @IsOptional()
   @Type(() => Number)

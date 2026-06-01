@@ -1,89 +1,149 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { ReportesService } from './reportes.service';
+import { Router } from '@angular/router';
+import { debounceTime } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Jaf } from '../../core/models/auth.model';
+import { AuthService } from '../../core/services/auth.service';
+import {
+  ReportePreviewResponse,
+  ReportesService,
+  TipoReporte,
+} from './reportes.service';
 
 @Component({
   selector: 'app-reportes',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
-  template: `
-    <div class="page-grid">
-      <article class="card">
-        <form [formGroup]="filtrosForm" class="form-grid">
-          <div>
-            <label>Fecha desde</label>
-            <input type="date" formControlName="fechaDesde" />
-          </div>
-          <div>
-            <label>Fecha hasta</label>
-            <input type="date" formControlName="fechaHasta" />
-          </div>
-          <div>
-            <label>Estado</label>
-            <select formControlName="estado">
-              <option value="">Todos</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="DERIVADO_CARABINEROS">Derivado Carabineros</option>
-              <option value="DERIVADO_PDI">Derivado PDI</option>
-              <option value="CERRADO">Cerrado</option>
-            </select>
-          </div>
-          <div>
-            <label>Tipo control</label>
-            <select formControlName="tipoControl">
-              <option value="">Todos</option>
-              <option value="INGRESO">Ingreso</option>
-              <option value="EGRESO">Egreso</option>
-            </select>
-          </div>
-          <div>
-            <label>Nacionalidad</label>
-            <input formControlName="nacionalidad" />
-          </div>
-          <div>
-            <label>Ubicación</label>
-            <input formControlName="ubicacion" />
-          </div>
-        </form>
-
-        <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem;">
-          <button class="btn-primary" (click)="exportarExcel()">
-            Exportar Excel
-          </button>
-          <button class="btn-secondary" (click)="exportarPdf()">
-            Exportar PDF
-          </button>
-        </div>
-      </article>
-    </div>
-  `,
+  templateUrl: './reportes.component.html',
+  styleUrl: './reportes.component.css',
 })
-export class ReportesComponent {
+export class ReportesComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly reportesService = inject(ReportesService);
+  private readonly authService = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+
+  readonly tiposReporte: Array<{ value: TipoReporte; label: string }> = [
+    { value: 'casos-creados', label: 'Casos creados' },
+    { value: 'casos-carabineros', label: 'Casos Carabineros' },
+    { value: 'casos-pdi', label: 'Casos PDI' },
+    { value: 'casos-cerrados', label: 'Casos cerrados' },
+  ];
 
   readonly filtrosForm = this.fb.group({
+    tipoReporte: ['casos-creados'],
     fechaDesde: [''],
     fechaHasta: [''],
-    estado: [''],
+    jaf: [''],
     tipoControl: [''],
-    nacionalidad: [''],
-    ubicacion: [''],
+    conMenores: [''],
   });
 
+  modalSelectorTipoAbierto = true;
+  preview: ReportePreviewResponse | null = null;
+  cargandoPreview = false;
+  errorVistaPrevia = '';
+  jafFijaAdminOperativo: Jaf | null = null;
+
+  get tipoReporteSeleccionado(): TipoReporte {
+    const value = this.filtrosForm.get('tipoReporte')?.value as TipoReporte | null;
+    return value ?? 'casos-creados';
+  }
+
+  get etiquetaTipoReporteSeleccionado(): string {
+    const item = this.tiposReporte.find(
+      (tipo) => tipo.value === this.tipoReporteSeleccionado,
+    );
+    return item?.label ?? 'Casos creados';
+  }
+
+  get esAdminOperativo(): boolean {
+    const user = this.authService.currentUser;
+    return user?.rol === 'ADMINISTRADOR' && !user.esMaster;
+  }
+
+  ngOnInit(): void {
+    this.aplicarRestriccionJaf();
+
+    this.filtrosForm.valueChanges
+      .pipe(debounceTime(250), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.cargarVistaPrevia());
+  }
+
+  abrirSelectorTipo(): void {
+    this.modalSelectorTipoAbierto = true;
+  }
+
+  cancelarSelectorTipo(): void {
+    this.modalSelectorTipoAbierto = false;
+    this.router.navigate(['/dashboard']);
+  }
+
+  seleccionarTipoReporte(tipo: TipoReporte): void {
+    this.filtrosForm.patchValue({ tipoReporte: tipo });
+    this.modalSelectorTipoAbierto = false;
+    this.cargarVistaPrevia();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (!this.modalSelectorTipoAbierto) {
+      return;
+    }
+
+    this.cancelarSelectorTipo();
+  }
+
   exportarExcel(): void {
+    const tipo = this.tipoReporteSeleccionado;
     const filtros = this.obtenerFiltrosSanitizados();
     this.reportesService
-      .exportarExcel(filtros)
-      .subscribe((blob) => this.descargar(blob, `reporte-casos-${Date.now()}.xlsx`));
+      .exportarExcel(tipo, filtros)
+      .subscribe((blob) => this.descargar(blob, `reporte-${tipo}-${Date.now()}.xlsx`));
   }
 
   exportarPdf(): void {
+    const tipo = this.tipoReporteSeleccionado;
     const filtros = this.obtenerFiltrosSanitizados();
     this.reportesService
-      .exportarPdf(filtros)
-      .subscribe((blob) => this.descargar(blob, `reporte-casos-${Date.now()}.pdf`));
+      .exportarPdf(tipo, filtros)
+      .subscribe((blob) => this.descargar(blob, `reporte-${tipo}-${Date.now()}.pdf`));
+  }
+
+  limpiarFiltros(): void {
+    const jafDefault = this.jafFijaAdminOperativo ?? '';
+    this.filtrosForm.patchValue({
+      fechaDesde: '',
+      fechaHasta: '',
+      jaf: jafDefault,
+      tipoControl: '',
+      conMenores: '',
+    });
+  }
+
+  private cargarVistaPrevia(): void {
+    if (this.modalSelectorTipoAbierto) {
+      return;
+    }
+
+    const tipo = this.tipoReporteSeleccionado;
+    const filtros = this.obtenerFiltrosSanitizados();
+    this.cargandoPreview = true;
+    this.errorVistaPrevia = '';
+
+    this.reportesService.obtenerVistaPrevia(tipo, filtros).subscribe({
+      next: (response) => {
+        this.preview = response;
+        this.cargandoPreview = false;
+      },
+      error: () => {
+        this.errorVistaPrevia = 'No fue posible cargar la vista previa con esos filtros.';
+        this.cargandoPreview = false;
+      },
+    });
   }
 
   private obtenerFiltrosSanitizados(): Record<string, string | undefined> {
@@ -91,10 +151,31 @@ export class ReportesComponent {
     const filtros: Record<string, string | undefined> = {};
 
     Object.entries(raw).forEach(([key, value]) => {
+      if (key === 'tipoReporte') {
+        return;
+      }
       filtros[key] = value ? String(value) : undefined;
     });
 
     return filtros;
+  }
+
+  private aplicarRestriccionJaf(): void {
+    const user = this.authService.currentUser;
+    const jafControl = this.filtrosForm.get('jaf');
+    if (!jafControl) {
+      return;
+    }
+
+    if (user?.rol === 'ADMINISTRADOR' && !user.esMaster && user.jaf) {
+      this.jafFijaAdminOperativo = user.jaf;
+      jafControl.setValue(user.jaf, { emitEvent: false });
+      jafControl.disable({ emitEvent: false });
+      return;
+    }
+
+    this.jafFijaAdminOperativo = null;
+    jafControl.enable({ emitEvent: false });
   }
 
   private descargar(blob: Blob, nombre: string): void {

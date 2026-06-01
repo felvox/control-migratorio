@@ -1,0 +1,291 @@
+      .login-shell {
+        position: relative;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background-image: url('/assets/login.png');
+        background-size: cover;
+        background-position: center;
+      }
+
+      .login-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(3, 15, 26, 0.28), rgba(8, 18, 26, 0.18));
+      }
+
+      .login-panel {
+        position: relative;
+        width: min(1180px, 100%);
+        min-height: 520px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 18px;
+        backdrop-filter: blur(2px);
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
+        overflow: hidden;
+      }
+
+      .left-column,
+      .right-column {
+        padding: 1.55rem 2rem;
+        color: #fff;
+      }
+
+      .left-column {
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.65rem;
+      }
+
+      .left-column h1 {
+        margin: 0;
+        font-size: clamp(2.3rem, 4.2vw, 3.7rem);
+        line-height: 1.1;
+      }
+
+      .left-column p {
+        margin: 0;
+        max-width: 430px;
+        color: rgba(240, 246, 252, 0.85);
+      }
+
+      .right-column {
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.55rem;
+      }
+
+      .right-column form.page-grid {
+        gap: 0.55rem;
+      }
+
+      .right-column h2 {
+        margin: 0;
+        font-size: 2rem;
+      }
+
+      .right-column label {
+        color: rgba(238, 244, 250, 0.9);
+        font-size: 0.87rem;
+      }
+
+      .right-column input[type='text'],
+      .right-column input[type='password'] {
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.95);
+        color: #1b2630;
+      }
+
+      .password-field {
+        position: relative;
+      }
+
+      .password-field input {
+        padding-right: 6.1rem;
+      }
+
+      .toggle-password {
+        position: absolute;
+        right: 0.35rem;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 1px solid #d4dbe3;
+        background: #f4f7fb;
+        color: #1b2630;
+        border-radius: 7px;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.78rem;
+      }
+
+      .remember-row {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin-top: 0;
+      }
+
+      .remember-row input {
+        width: auto;
+      }
+
+      .btn-login {
+        background: #d68831;
+        color: #fff;
+        border: none;
+        padding: 0.62rem 0.9rem;
+        font-weight: 600;
+        margin-top: 0.2rem;
+      }
+
+      .btn-login:disabled {
+        opacity: 0.7;
+      }
+
+      .demo-access {
+        margin-top: 0.55rem;
+        padding: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 14px;
+        background: rgba(6, 13, 20, 0.5);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
+      .demo-access__header {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        align-items: flex-start;
+        margin-bottom: 0.55rem;
+      }
+
+      .demo-access__header div {
+        display: grid;
+        gap: 0.08rem;
+      }
+
+      .demo-access__header span {
+        color: rgba(238, 244, 250, 0.68);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .demo-access__header strong {
+        color: #ffffff;
+        font-size: 0.95rem;
+      }
+
+      .demo-access__header small {
+        color: rgba(238, 244, 250, 0.7);
+        font-size: 0.72rem;
+        text-align: right;
+      }
+
+      .demo-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.45rem;
+        max-height: 245px;
+        overflow-y: auto;
+        padding-right: 0.15rem;
+      }
+
+      .demo-profile {
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 11px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        padding: 0.52rem 0.62rem;
+        display: grid;
+        gap: 0.12rem;
+        text-align: left;
+        transition:
+          transform 0.16s ease,
+          border-color 0.16s ease,
+          background 0.16s ease;
+      }
+
+      .demo-profile:hover:not(:disabled) {
+        transform: translateY(-1px);
+        border-color: rgba(214, 136, 49, 0.85);
+        background: rgba(214, 136, 49, 0.18);
+      }
+
+      .demo-profile:disabled {
+        opacity: 0.58;
+        cursor: wait;
+      }
+
+      .demo-profile span {
+        font-weight: 700;
+        font-size: 0.82rem;
+      }
+
+      .demo-profile small {
+        color: rgba(238, 244, 250, 0.72);
+        font-size: 0.7rem;
+        line-height: 1.25;
+      }
+
+      .demo-profile em {
+        color: #f3b15e;
+        font-size: 0.7rem;
+        font-style: normal;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(5, 9, 14, 0.55);
+        display: grid;
+        place-items: center;
+        z-index: 1000;
+        padding: 1rem;
+      }
+
+      .modal-content {
+        width: min(420px, 100%);
+        border-radius: 12px;
+        border: 1px solid #d8dfe7;
+        background: #ffffff;
+        color: #1b2630;
+        padding: 1rem;
+        display: grid;
+        gap: 0.65rem;
+      }
+
+      .modal-content h3 {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+
+      .modal-content p {
+        margin: 0;
+        color: #41505d;
+      }
+
+      .btn-modal {
+        justify-self: end;
+        border: 1px solid #c8d1da;
+        background: #f3f6f9;
+        color: #1b2630;
+      }
+
+      @media (max-width: 900px) {
+        .login-panel {
+          grid-template-columns: 1fr;
+          min-height: auto;
+        }
+
+        .left-column,
+        .right-column {
+          padding: 1.2rem;
+        }
+
+        .demo-grid {
+          max-height: none;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .demo-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .demo-access__header {
+          display: grid;
+        }
+
+        .demo-access__header small {
+          text-align: left;
+        }
+      }
+    

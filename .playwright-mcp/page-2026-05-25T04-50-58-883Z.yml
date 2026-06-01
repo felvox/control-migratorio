@@ -1,0 +1,69 @@
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - img "Logo institucional" [ref=e8]
+      - generic [ref=e9]:
+        - heading "Control Migratorio" [level=1] [ref=e10]
+        - paragraph [ref=e11]: JAF TARAPACÁ
+    - button "Ocultar barra lateral" [ref=e12] [cursor=pointer]:
+      - img [ref=e13]
+    - navigation [ref=e16]:
+      - link "Casos por revisar" [ref=e17] [cursor=pointer]:
+        - /url: /casos/por-revisar-carabineros
+        - img [ref=e19]
+        - generic [ref=e22]: Casos por revisar
+      - link "Casos derivados a PDI" [ref=e23] [cursor=pointer]:
+        - /url: /casos/derivados-pdi
+        - img [ref=e25]
+        - generic [ref=e28]: Casos derivados a PDI
+      - link "Consultar Casos" [ref=e29] [cursor=pointer]:
+        - /url: /casos
+        - img [ref=e31]
+        - generic [ref=e34]: Consultar Casos
+    - button "Cerrar sesión" [ref=e36] [cursor=pointer]:
+      - img [ref=e37]
+      - generic [ref=e40]: Cerrar sesión
+  - main [ref=e41]:
+    - generic [ref=e42]:
+      - heading "Casos por revisar (Carabineros)" [level=2] [ref=e44]
+      - generic [ref=e45]:
+        - button "CB1 Cesar Vasquez" [ref=e46] [cursor=pointer]:
+          - img [ref=e48]
+          - strong [ref=e51]: CB1 Cesar Vasquez
+        - button "CARABINEROS" [ref=e52] [cursor=pointer]
+    - generic [ref=e55]:
+      - article [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]: Nombre
+            - textbox [ref=e60]
+          - generic [ref=e61]:
+            - generic [ref=e62]: Documento
+            - textbox [ref=e63]
+          - generic [ref=e64]:
+            - generic [ref=e65]: Ubicación
+            - textbox [ref=e66]
+          - generic [ref=e67]:
+            - generic [ref=e68]: Estado
+            - combobox [ref=e69]:
+              - option "Todos" [selected]
+              - option "Pendiente"
+              - option "Derivado Carabineros"
+              - option "Derivado PDI"
+              - option "Cerrado"
+          - generic [ref=e70]:
+            - button "Buscar" [ref=e71] [cursor=pointer]
+            - button "Limpiar" [ref=e72] [cursor=pointer]
+      - article [ref=e73]:
+        - table [ref=e74]:
+          - rowgroup [ref=e75]:
+            - row "Código Fecha Tipo Lugar Estado Principal Operador" [ref=e76]:
+              - columnheader "Código" [ref=e77]
+              - columnheader "Fecha" [ref=e78]
+              - columnheader "Tipo" [ref=e79]
+              - columnheader "Lugar" [ref=e80]
+              - columnheader "Estado" [ref=e81]
+              - columnheader "Principal" [ref=e82]
+              - columnheader "Operador" [ref=e83]
+              - columnheader [ref=e84]
+          - rowgroup

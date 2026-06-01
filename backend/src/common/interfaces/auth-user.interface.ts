@@ -7,4 +7,5 @@ export interface AuthUser {
   nombreCompleto: string;
   esMaster: boolean;
   jaf: Jaf | null;
+  sesionId?: string;
 }

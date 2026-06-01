@@ -1,0 +1,37 @@
+[      44ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[     135ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63940
+[    5376ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/auth/logout:0
+[  232159ms] [INFO] [webpack-dev-server] App updated. Recompiling... @ http://127.0.0.1:4200/polyfills.js:2002
+[  233781ms] [INFO] [webpack-dev-server] App updated. Reloading... @ http://127.0.0.1:4200/polyfills.js:2002
+[  233856ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[  234015ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63940
+[  234178ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0
+[  239630ms] [INFO] [webpack-dev-server] App updated. Recompiling... @ http://127.0.0.1:4200/polyfills.js:2002
+[  240442ms] [INFO] [webpack-dev-server] App updated. Reloading... @ http://127.0.0.1:4200/polyfills.js:2002
+[  240552ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[  240699ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63943
+[  240797ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0
+[  246800ms] [INFO] [webpack-dev-server] App updated. Recompiling... @ http://127.0.0.1:4200/polyfills.js:2002
+[  248505ms] [INFO] [webpack-dev-server] App updated. Reloading... @ http://127.0.0.1:4200/polyfills.js:2002
+[  248611ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[  248829ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63947
+[  248908ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0
+[  369062ms] [INFO] [webpack-dev-server] Disconnected! @ http://127.0.0.1:4200/polyfills.js:2002
+[  369063ms] [INFO] [webpack-dev-server] Trying to reconnect... @ http://127.0.0.1:4200/polyfills.js:2002
+[  370077ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:4200/ng-cli-ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4200/polyfills.js:657
+[  370077ms] [ERROR] [webpack-dev-server] Event @ http://127.0.0.1:4200/polyfills.js:2010
+[  370078ms] [INFO] [webpack-dev-server] Trying to reconnect... @ http://127.0.0.1:4200/polyfills.js:2002
+[  372114ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:4200/ng-cli-ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4200/polyfills.js:657
+[  372114ms] [ERROR] [webpack-dev-server] Event @ http://127.0.0.1:4200/polyfills.js:2010
+[  372115ms] [INFO] [webpack-dev-server] Trying to reconnect... @ http://127.0.0.1:4200/polyfills.js:2002
+[  376211ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:4200/ng-cli-ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4200/polyfills.js:657
+[  376211ms] [ERROR] [webpack-dev-server] Event @ http://127.0.0.1:4200/polyfills.js:2010
+[  376211ms] [INFO] [webpack-dev-server] Trying to reconnect... @ http://127.0.0.1:4200/polyfills.js:2002
+[  384297ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:4200/ng-cli-ws' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4200/polyfills.js:657
+[  384298ms] [ERROR] [webpack-dev-server] Event @ http://127.0.0.1:4200/polyfills.js:2010
+[  384298ms] [INFO] [webpack-dev-server] Trying to reconnect... @ http://127.0.0.1:4200/polyfills.js:2002
+[ 1104095ms] [INFO] [webpack-dev-server] App updated. Recompiling... @ http://127.0.0.1:4200/polyfills.js:2002
+[ 1107894ms] [INFO] [webpack-dev-server] App updated. Reloading... @ http://127.0.0.1:4200/polyfills.js:2002
+[ 1107972ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[ 1108088ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63960
+[ 1108144ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0

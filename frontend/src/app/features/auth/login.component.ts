@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import {
   FormBuilder,
   ReactiveFormsModule,
@@ -8,276 +8,135 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize, timeout } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/services/auth.service';
 import { formatRunForInput } from '../../core/utils/run.util';
 import { ProgressivePasswordMaskDirective } from '../../shared/directives/progressive-password-mask.directive';
 
 const LOGIN_RUN_KEY = 'cm_login_run';
 const LOGIN_PASSWORD_KEY = 'cm_login_password';
+const DEMO_PASSWORD = 'Demo123*';
+
+type DemoLoginProfile = {
+  titulo: string;
+  detalle: string;
+  run: string;
+  password: string;
+};
+
+const DEMO_LOGIN_PROFILES: DemoLoginProfile[] = [
+  {
+    titulo: 'Administrador Master',
+    detalle: 'Control total del sistema',
+    run: '15.960.680-5',
+    password: 'Admin123*',
+  },
+  {
+    titulo: 'Admin Tarapacá',
+    detalle: 'Administrador operativo JAF',
+    run: '21.000.001-1',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Admin Antofagasta',
+    detalle: 'Administrador operativo JAF',
+    run: '21.000.002-K',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Admin Arica',
+    detalle: 'Administrador operativo JAF',
+    run: '21.000.003-8',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Operador Tarapacá',
+    detalle: 'Registro y gestión de casos',
+    run: '21.000.004-6',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Operador Antofagasta',
+    detalle: 'Registro y gestión de casos',
+    run: '21.000.005-4',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Operador Arica',
+    detalle: 'Registro y gestión de casos',
+    run: '21.000.006-2',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Consulta Tarapacá',
+    detalle: 'Consulta de casos JAF Tarapacá',
+    run: '21.000.014-3',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Consulta Antofagasta',
+    detalle: 'Consulta de casos JAF Antofagasta',
+    run: '21.000.015-1',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Consulta Arica',
+    detalle: 'Consulta de casos JAF Arica',
+    run: '21.000.016-K',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Auditor',
+    detalle: 'Consulta y trazabilidad',
+    run: '21.000.007-0',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Carabineros Tarapacá',
+    detalle: 'Mesa institucional JAF Tarapacá',
+    run: '21.000.008-9',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Carabineros Antofagasta',
+    detalle: 'Mesa institucional JAF Antofagasta',
+    run: '21.000.009-7',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'Carabineros Arica',
+    detalle: 'Mesa institucional JAF Arica',
+    run: '21.000.010-0',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'PDI Tarapacá',
+    detalle: 'Recepción y cierre JAF Tarapacá',
+    run: '21.000.011-9',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'PDI Antofagasta',
+    detalle: 'Recepción y cierre JAF Antofagasta',
+    run: '21.000.012-7',
+    password: DEMO_PASSWORD,
+  },
+  {
+    titulo: 'PDI Arica',
+    detalle: 'Recepción y cierre JAF Arica',
+    run: '21.000.013-5',
+    password: DEMO_PASSWORD,
+  },
+];
 
 @Component({
   selector: 'app-login',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, ProgressivePasswordMaskDirective],
-  template: `
-    <div class="login-shell">
-      <div class="login-overlay"></div>
-
-      <div class="login-panel">
-        <section class="left-column">
-          <h1>Sistema Migratorio</h1>
-          <p>
-            Bienvenido al Sistema Web de Control Migratorio, plataforma para el
-            registro, consulta y seguimiento.
-          </p>
-        </section>
-
-        <section class="right-column">
-          <h2>Iniciar sesión</h2>
-
-          <form [formGroup]="form" (ngSubmit)="submit()" class="page-grid">
-            <div>
-              <label>Usuario</label>
-              <input
-                formControlName="run"
-                type="text"
-                placeholder="12.345.678-5"
-                autocomplete="username"
-                (input)="onRunInput($event)"
-              />
-            </div>
-
-            <div>
-              <label>Clave</label>
-              <div class="password-field">
-                <input
-                  formControlName="password"
-                  [type]="mostrarClave ? 'text' : 'password'"
-                  [appProgressivePasswordMask]="!mostrarClave"
-                  placeholder="••••••••"
-                  autocomplete="current-password"
-                />
-                <button
-                  type="button"
-                  class="toggle-password"
-                  (click)="toggleMostrarClave()"
-                >
-                  {{ mostrarClave ? 'Ocultar' : 'Mostrar' }}
-                </button>
-              </div>
-            </div>
-
-            <label class="remember-row">
-              <input type="checkbox" formControlName="recordar" />
-              <span>Recordar sesión en este equipo</span>
-            </label>
-
-            <button class="btn-login" [disabled]="loading">
-              {{ loading ? 'Ingresando...' : 'Ingresar' }}
-            </button>
-          </form>
-        </section>
-      </div>
-
-      <div
-        class="modal-overlay"
-        *ngIf="modalErrorAbierto"
-        (click)="cerrarModalError()"
-      >
-        <div class="modal-content" (click)="$event.stopPropagation()">
-          <h3>Acceso no válido</h3>
-          <p>{{ modalErrorMensaje }}</p>
-          <button type="button" class="btn-modal" (click)="cerrarModalError()">
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </div>
-  `,
-  styles: [
-    `
-      .login-shell {
-        position: relative;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: 1rem;
-        background-image: url('/assets/login.png');
-        background-size: cover;
-        background-position: center;
-      }
-
-      .login-overlay {
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, rgba(3, 15, 26, 0.28), rgba(8, 18, 26, 0.18));
-      }
-
-      .login-panel {
-        position: relative;
-        width: min(1040px, 100%);
-        min-height: 430px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        border-radius: 18px;
-        backdrop-filter: blur(2px);
-        display: grid;
-        grid-template-columns: 1.2fr 1fr;
-        overflow: hidden;
-      }
-
-      .left-column,
-      .right-column {
-        padding: 1.55rem 2rem;
-        color: #fff;
-      }
-
-      .left-column {
-        background: transparent;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 0.65rem;
-      }
-
-      .left-column h1 {
-        margin: 0;
-        font-size: clamp(2.3rem, 4.2vw, 3.7rem);
-        line-height: 1.1;
-      }
-
-      .left-column p {
-        margin: 0;
-        max-width: 430px;
-        color: rgba(240, 246, 252, 0.85);
-      }
-
-      .right-column {
-        background: transparent;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 0.55rem;
-      }
-
-      .right-column form.page-grid {
-        gap: 0.55rem;
-      }
-
-      .right-column h2 {
-        margin: 0;
-        font-size: 2rem;
-      }
-
-      .right-column label {
-        color: rgba(238, 244, 250, 0.9);
-        font-size: 0.87rem;
-      }
-
-      .right-column input[type='text'],
-      .right-column input[type='password'] {
-        border: 1px solid rgba(255, 255, 255, 0.35);
-        background: rgba(255, 255, 255, 0.95);
-        color: #1b2630;
-      }
-
-      .password-field {
-        position: relative;
-      }
-
-      .password-field input {
-        padding-right: 6.1rem;
-      }
-
-      .toggle-password {
-        position: absolute;
-        right: 0.35rem;
-        top: 50%;
-        transform: translateY(-50%);
-        border: 1px solid #d4dbe3;
-        background: #f4f7fb;
-        color: #1b2630;
-        border-radius: 7px;
-        padding: 0.2rem 0.55rem;
-        font-size: 0.78rem;
-      }
-
-      .remember-row {
-        display: flex;
-        align-items: center;
-        gap: 0.55rem;
-        margin-top: 0;
-      }
-
-      .remember-row input {
-        width: auto;
-      }
-
-      .btn-login {
-        background: #d68831;
-        color: #fff;
-        border: none;
-        padding: 0.62rem 0.9rem;
-        font-weight: 600;
-        margin-top: 0.2rem;
-      }
-
-      .btn-login:disabled {
-        opacity: 0.7;
-      }
-
-      .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(5, 9, 14, 0.55);
-        display: grid;
-        place-items: center;
-        z-index: 1000;
-        padding: 1rem;
-      }
-
-      .modal-content {
-        width: min(420px, 100%);
-        border-radius: 12px;
-        border: 1px solid #d8dfe7;
-        background: #ffffff;
-        color: #1b2630;
-        padding: 1rem;
-        display: grid;
-        gap: 0.65rem;
-      }
-
-      .modal-content h3 {
-        margin: 0;
-        font-size: 1.2rem;
-      }
-
-      .modal-content p {
-        margin: 0;
-        color: #41505d;
-      }
-
-      .btn-modal {
-        justify-self: end;
-        border: 1px solid #c8d1da;
-        background: #f3f6f9;
-        color: #1b2630;
-      }
-
-      @media (max-width: 900px) {
-        .login-panel {
-          grid-template-columns: 1fr;
-          min-height: auto;
-        }
-
-        .left-column,
-        .right-column {
-          padding: 1.2rem;
-        }
-      }
-    `,
-  ],
+  templateUrl: './login.component.html',
+  styleUrl: './login.component.css',
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
@@ -287,6 +146,7 @@ export class LoginComponent {
   mostrarClave = false;
   modalErrorAbierto = false;
   modalErrorMensaje = '';
+  readonly perfilesDemo = environment.production ? [] : DEMO_LOGIN_PROFILES;
 
   readonly form = this.fb.group({
     run: ['', [Validators.required]],
@@ -296,6 +156,18 @@ export class LoginComponent {
 
   constructor() {
     this.cargarCredencialesRecordadas();
+  }
+
+  ngOnInit(): void {
+    const reason = this.route.snapshot.queryParamMap.get('reason');
+    if (reason === 'inactividad') {
+      this.abrirModalError('Tu sesión se cerró por inactividad. Inicia sesión nuevamente.');
+      return;
+    }
+
+    if (reason === 'expirada') {
+      this.abrirModalError('Tu sesión expiró o ya no es válida. Inicia sesión nuevamente.');
+    }
   }
 
   submit(): void {
@@ -377,6 +249,13 @@ export class LoginComponent {
           return;
         }
 
+        if (error.status === 429) {
+          this.abrirModalError(
+            'Demasiados intentos fallidos. Espera unos minutos antes de volver a intentar.',
+          );
+          return;
+        }
+
         this.abrirModalError('Usuario o clave inválidos');
       },
     });
@@ -395,6 +274,37 @@ export class LoginComponent {
 
   toggleMostrarClave(): void {
     this.mostrarClave = !this.mostrarClave;
+  }
+
+  ingresarComoDemo(perfil: DemoLoginProfile): void {
+    if (this.loading) {
+      return;
+    }
+
+    const ingresar = () => {
+      this.form.patchValue(
+        {
+          run: perfil.run,
+          password: perfil.password,
+          recordar: false,
+        },
+        { emitEvent: false },
+      );
+      this.submit();
+    };
+
+    if (!this.authService.isAuthenticated()) {
+      ingresar();
+      return;
+    }
+
+    this.loading = true;
+    this.authService.logout().pipe(
+      finalize(() => {
+        this.loading = false;
+        ingresar();
+      }),
+    ).subscribe();
   }
 
   abrirModalError(mensaje: string): void {

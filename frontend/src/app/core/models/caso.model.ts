@@ -11,6 +11,12 @@ export type TipoEvidencia =
   | 'FOTO_PERSONA'
   | 'DOCUMENTO_IDENTIDAD'
   | 'ADJUNTO_GENERAL';
+export type PdiSituacionMigratoria = 'INGRESO_PNH' | 'EGRESO_PNH';
+export type PdiResultado =
+  | 'RECONDUCCION'
+  | 'DENUNCIA_SNM_TERRITORIO_NACIONAL'
+  | 'DENUNCIA_SNM_SALIDA_VOLUNTARIA'
+  | 'PUESTA_DISPOSICION_TRIBUNAL';
 
 export interface PersonaCaso {
   id?: string;
@@ -45,6 +51,11 @@ export interface Caso {
   existenMenores: boolean;
   estado: EstadoCaso;
   institucionDerivacion: 'NINGUNA' | 'CARABINEROS' | 'PDI';
+  pdiOrdenJudicialVigente?: boolean | null;
+  pdiSituacionMigratoria?: PdiSituacionMigratoria | null;
+  pdiReconducible?: boolean | null;
+  pdiResultado?: PdiResultado | null;
+  pdiObservacionesCierre?: string | null;
   creadoPor: {
     id: string;
     nombreCompleto: string;
@@ -65,6 +76,11 @@ export interface Evidencia {
   mimeType: string;
   tamanoBytes: number;
   creadoAt: string;
+  creadoPor?: {
+    id: string;
+    nombreCompleto: string;
+    rol: Rol;
+  };
 }
 
 export interface DocumentoGenerado {

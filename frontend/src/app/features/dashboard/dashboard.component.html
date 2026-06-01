@@ -1,0 +1,263 @@
+<div class="dashboard-page" *ngIf="resumen as data; else loadingTpl">
+      <section class="kpi-row" aria-label="Métricas principales">
+        <article class="kpi-card kpi-blue">
+          <div class="kpi-icon">📋</div>
+          <div>
+            <label>{{ etiquetaKpiDia }}</label>
+            <strong>{{ data.metricasOperativas.actasHoy }}</strong>
+          </div>
+        </article>
+
+        <article class="kpi-card kpi-green">
+          <div class="kpi-icon">👶</div>
+          <div>
+            <label>Menores de edad hoy</label>
+            <strong>{{ data.metricasOperativas.menoresEdad }}</strong>
+          </div>
+        </article>
+
+        <article class="kpi-card kpi-orange">
+          <div class="kpi-icon">🪪</div>
+          <div>
+            <label>No documentados hoy</label>
+            <strong>{{ data.metricasOperativas.noDocumentados }}</strong>
+          </div>
+        </article>
+
+        <article class="kpi-card kpi-red">
+          <div class="kpi-icon">➕</div>
+          <div>
+            <label>Con lesiones hoy</label>
+            <strong>{{ data.metricasOperativas.conLesiones }}</strong>
+          </div>
+        </article>
+
+        <article class="kpi-card kpi-teal">
+          <div class="kpi-icon">✅</div>
+          <div>
+            <label>Casos cerrados hoy</label>
+            <strong>{{ data.metricasOperativas.casosCerrados }}</strong>
+          </div>
+        </article>
+      </section>
+
+      <section class="charts-grid" aria-label="Panel analítico">
+        <article class="panel line-panel">
+          <div class="panel-head">
+            <h3>Actas por día</h3>
+            <span class="panel-chip">Últimos 7 días</span>
+          </div>
+
+          <div class="line-wrap">
+            <svg
+              class="line-svg"
+              [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight"
+              preserveAspectRatio="none"
+            >
+              <line
+                *ngFor="let level of [0,1,2,3,4]"
+                [attr.x1]="paddingX"
+                [attr.x2]="chartWidth - paddingX"
+                [attr.y1]="yGrid(level)"
+                [attr.y2]="yGrid(level)"
+                class="grid-line"
+              />
+
+              <polyline [attr.points]="linePointsString" class="line-path"></polyline>
+
+              <g *ngFor="let p of linePoints">
+                <circle [attr.cx]="p.x" [attr.cy]="p.y" r="3.6" class="line-dot"></circle>
+                <text [attr.x]="p.x" [attr.y]="p.y - 8" class="line-value">{{ p.total }}</text>
+                <text [attr.x]="p.x" [attr.y]="chartHeight - 7" class="line-label">{{ p.etiqueta }}</text>
+              </g>
+            </svg>
+
+            <div class="line-empty" *ngIf="!hayTendencia">Sin registros en los últimos 7 días</div>
+          </div>
+        </article>
+
+        <article class="panel donut-panel">
+          <h3>Tipo de situación</h3>
+          <div class="donut" [style.background]="donutTipoStyle">
+            <div class="donut-center">
+              <strong>{{ totalSituacion }}</strong>
+              <span>Total</span>
+            </div>
+          </div>
+          <ul class="legend">
+            <li *ngFor="let item of data.porTipoControl">
+              <span class="dot" [style.background]="colorTipo(item.tipo)"></span>
+              {{ etiquetaTipo(item.tipo) }}
+              <strong>{{ item.total }} ({{ porcentaje(item.total, totalSituacion) }}%)</strong>
+            </li>
+          </ul>
+        </article>
+
+        <article class="panel donut-panel">
+          <h3>Documentado / No documentado</h3>
+          <div class="donut" [style.background]="donutDocumentadoStyle">
+            <div class="donut-center">
+              <strong>{{ totalDocumentacion }}</strong>
+              <span>Total</span>
+            </div>
+          </div>
+          <ul class="legend">
+            <li>
+              <span class="dot" style="background:#3b82f6"></span>
+              Documentado
+              <strong>{{ data.documentacion.si }} ({{ porcentaje(data.documentacion.si, totalDocumentacion) }}%)</strong>
+            </li>
+            <li>
+              <span class="dot" style="background:#ef4444"></span>
+              No documentado
+              <strong>{{ data.documentacion.no }} ({{ porcentaje(data.documentacion.no, totalDocumentacion) }}%)</strong>
+            </li>
+          </ul>
+        </article>
+
+        <article class="panel bar-panel">
+          <h3>Top nacionalidades</h3>
+          <div class="bars">
+            <div class="bar-col" *ngFor="let item of topNacionalidadesBars; let i = index">
+              <div class="bar-num">{{ item.total }}</div>
+              <div class="bar-track">
+                <div
+                  class="bar-fill"
+                  [class.placeholder]="item.placeholder"
+                  [style.height.%]="item.pct"
+                  [style.background]="item.placeholder ? '#dbe2ea' : colorNacionalidad(i)"
+                ></div>
+              </div>
+              <div class="bar-label">{{ item.nacionalidad }}</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel donut-panel">
+          <h3>Mayores vs Menores</h3>
+          <div class="donut" [style.background]="donutEdadesStyle">
+            <div class="donut-center">
+              <strong>{{ totalEtario }}</strong>
+              <span>Total</span>
+            </div>
+          </div>
+          <ul class="legend">
+            <li>
+              <span class="dot" style="background:#3b82f6"></span>
+              Mayores de edad
+              <strong>{{ data.personasEtarias.mayores }} ({{ porcentaje(data.personasEtarias.mayores, totalEtario) }}%)</strong>
+            </li>
+            <li>
+              <span class="dot" style="background:#22c55e"></span>
+              Menores de edad
+              <strong>{{ data.personasEtarias.menores }} ({{ porcentaje(data.personasEtarias.menores, totalEtario) }}%)</strong>
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="table-panel">
+        <h3>Últimos casos registrados</h3>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>N° Acta</th>
+                <th>Fecha / Hora</th>
+                <th>Nombre</th>
+                <th>Nacionalidad</th>
+                <th>Tipo</th>
+                <th>Documentado</th>
+                <th>Lesiones</th>
+                <th>Estado</th>
+                <th>Organismo receptor</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="filasTabla.length === 0">
+                <td colspan="10" class="table-empty">No hay casos registrados aún.</td>
+              </tr>
+
+              <tr *ngFor="let fila of filasPagina">
+                <td>{{ fila.codigo }}</td>
+                <td>{{ fila.fechaHora | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ fila.nombre }}</td>
+                <td>{{ fila.nacionalidad }}</td>
+                <td>
+                  <span
+                    class="badge"
+                    [class.badge-blue]="fila.tipoControl === 'INGRESO'"
+                    [class.badge-green]="fila.tipoControl === 'EGRESO'"
+                  >
+                    {{ etiquetaTipo(fila.tipoControl) }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge" [class.badge-green]="fila.documentado" [class.badge-red]="!fila.documentado">
+                    {{ fila.documentado ? 'Sí' : 'No' }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge" [class.badge-red]="fila.lesiones" [class.badge-muted]="!fila.lesiones">
+                    {{ fila.lesiones ? 'Sí' : 'No' }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    class="badge"
+                    [class.badge-yellow]="fila.estado === 'PENDIENTE'"
+                    [class.badge-blue]="fila.estado === 'DERIVADO_PDI'"
+                    [class.badge-purple]="fila.estado === 'DERIVADO_CARABINEROS'"
+                    [class.badge-green]="fila.estado === 'CERRADO'"
+                  >
+                    {{ etiquetaEstado(fila.estado) }}
+                  </span>
+                </td>
+                <td>{{ etiquetaDerivacion(fila.derivacion) }}</td>
+                <td>
+                  <button class="btn-ver" type="button" (click)="verCaso(fila.id)">Ver</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-footer">
+          <span>Mostrando {{ filasPagina.length }} de {{ filasTabla.length }} registros</span>
+          <div class="pagination" *ngIf="filasTabla.length > tamPagina">
+            <button type="button" (click)="irPagina(paginaActual - 1)" [disabled]="paginaActual === 1">‹</button>
+            <button
+              *ngFor="let p of paginas"
+              type="button"
+              [class.activo]="p === paginaActual"
+              (click)="irPagina(p)"
+            >
+              {{ p }}
+            </button>
+            <button type="button" (click)="irPagina(paginaActual + 1)" [disabled]="paginaActual === totalPaginas">›</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <ng-template #loadingTpl>
+      <div class="loading-state" *ngIf="!errorCarga; else errorTpl">Cargando panel de control...</div>
+    </ng-template>
+
+    <ng-template #errorTpl>
+      <div class="loading-state">
+        <p>{{ errorCarga }}</p>
+        <button type="button" class="btn-reintentar" (click)="reintentarCarga()">Reintentar</button>
+      </div>
+    </ng-template>
+
+    <app-alert-modal
+      [open]="alertAvisoAbierto"
+      title="Aviso"
+      [message]="alertaAvisoMensaje"
+      variant="warning"
+      (accepted)="cerrarAlertaAviso()"
+    />
+  

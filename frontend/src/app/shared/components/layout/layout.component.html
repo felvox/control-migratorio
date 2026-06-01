@@ -1,0 +1,390 @@
+    <div class="layout-shell" [class.sidebar-collapsed]="sidebarOculta">
+      <aside class="sidebar">
+        <div
+          class="sidebar-top"
+          [class.sidebar-top-collapsed]="sidebarOculta"
+          [class.sidebar-top-carabineros]="esPerfilCarabineros"
+          [class.sidebar-top-pdi]="esPerfilPdi"
+        >
+          <div
+            class="brand-mark"
+            [class.brand-mark-admin]="esPerfilAdminAuditor"
+            [class.brand-mark-jaf]="esLogoJaf"
+            [class.brand-mark-carabineros]="esPerfilCarabineros"
+            [class.brand-mark-pdi]="esPerfilPdi"
+          >
+            <img [src]="logoSidebarUrl" alt="Logo institucional" />
+          </div>
+
+          <div class="brand-text" *ngIf="!sidebarOculta">
+            <h1>Control Migratorio</h1>
+            <p *ngIf="subtituloSidebar">{{ subtituloSidebar }}</p>
+            <span class="brand-institution" *ngIf="institucionSidebar">
+              {{ institucionSidebar }}
+            </span>
+          </div>
+        </div>
+
+        <button
+          class="btn-sidebar-edge"
+          type="button"
+          [attr.aria-label]="sidebarOculta ? 'Mostrar barra lateral' : 'Ocultar barra lateral'"
+          [attr.title]="sidebarOculta ? 'Mostrar barra lateral' : 'Ocultar barra lateral'"
+          (click)="toggleSidebar()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M9 4v16" />
+            <path *ngIf="!sidebarOculta" d="m15 12-3-3m3 3-3 3" />
+            <path *ngIf="sidebarOculta" d="m12 12 3-3m-3 3 3 3" />
+          </svg>
+        </button>
+
+        <nav class="menu" [class.menu-collapsed]="sidebarOculta">
+          <ng-container *ngFor="let item of menuItemsVisibles">
+            <div class="menu-divider" *ngIf="item.dividerBefore"></div>
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+              [attr.title]="sidebarOculta ? item.label : null"
+              [class.link-collapsed]="sidebarOculta"
+              [class.link-disabled]="item.disabled"
+              [attr.aria-disabled]="item.disabled ? 'true' : null"
+              [attr.tabindex]="item.disabled ? -1 : null"
+              (click)="onMenuClick($event, item)"
+            >
+              <span class="menu-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" [ngSwitch]="item.icon">
+                  <g *ngSwitchCase="'dashboard'">
+                    <path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z" />
+                  </g>
+                  <g *ngSwitchCase="'casos'">
+                    <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  </g>
+                  <g *ngSwitchCase="'usuarios'">
+                    <path d="M16 11a4 4 0 1 0-3.999-4A4 4 0 0 0 16 11zM8 13a3 3 0 1 0-.001-6A3 3 0 0 0 8 13z" />
+                    <path d="M8 14c-2.9 0-5 1.6-5 3.4V19h10v-1.6C13 15.6 10.9 14 8 14zM16 12c-2.5 0-4.5 1.3-4.5 2.9V19H21v-4.1C21 13.3 19 12 16 12z" />
+                  </g>
+                  <g *ngSwitchCase="'reportes'">
+                    <path d="M4 19h16M7 16V9M12 16V5M17 16v-4" />
+                  </g>
+                  <g *ngSwitchCase="'consulta'">
+                    <circle cx="10.5" cy="10.5" r="5.5" />
+                    <path d="m21 21-6-6" />
+                  </g>
+                  <g *ngSwitchCase="'feedback'">
+                    <rect x="3" y="6" width="18" height="12" rx="2" />
+                    <path d="m4 8 8 6 8-6" />
+                  </g>
+                </svg>
+              </span>
+              <span class="menu-label" *ngIf="!sidebarOculta">
+                {{ item.label }}
+                <span class="menu-chip-badge" *ngIf="item.badgeCount">{{ item.badgeCount }}</span>
+              </span>
+            </a>
+          </ng-container>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <button
+            class="btn-logout"
+            [class.btn-logout-collapsed]="sidebarOculta"
+            [attr.title]="sidebarOculta ? 'Cerrar sesión' : null"
+            (click)="logout()"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 6H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4" />
+              <path d="m15 16 5-4-5-4M20 12H9" />
+            </svg>
+            <span *ngIf="!sidebarOculta">Cerrar sesión</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header
+          class="topbar"
+          [class.topbar-dashboard]="esDashboardActivo"
+          [class.topbar-auditoria]="esAuditoriaActiva"
+        >
+          <div class="topbar-page-title">
+            <div class="topbar-title-row">
+              <h2>{{ tituloPaginaActual }}</h2>
+            </div>
+            <div class="topbar-title-chips" *ngIf="esAuditoriaActiva">
+              <button
+                type="button"
+                class="topbar-chip-action"
+                (click)="abrirModalUsuariosActivos('ACTIVOS')"
+              >
+                Usuarios activos
+              </button>
+              <button
+                type="button"
+                class="topbar-chip-action topbar-chip-action--muted"
+                (click)="abrirModalUsuariosActivos('DESCONECTADOS')"
+              >
+                Usuarios desconectados
+              </button>
+              <button
+                type="button"
+                class="topbar-chip-action topbar-chip-action--warning"
+                (click)="verEventosSeguridad()"
+              >
+                Eventos de Seguridad
+                <span
+                  class="topbar-chip-badge"
+                  *ngIf="eventosSeguridadPendientes > 0"
+                >
+                  {{ eventosSeguridadPendientes }}
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="topbar-center" *ngIf="esDashboardActivo">
+            <label class="topbar-date-chip" aria-label="Fecha de referencia del panel">
+              <span class="topbar-date-icon">📅</span>
+              <input
+                class="topbar-date-input"
+                type="date"
+                [value]="fechaDashboardIso"
+                (change)="onDashboardFechaChange($event)"
+              />
+            </label>
+          </div>
+          <div class="topbar-user">
+            <button
+              type="button"
+              class="btn-profile"
+              (click)="abrirModalCambioPassword()"
+              [disabled]="!authService.currentUser"
+              title="Cambiar contraseña"
+            >
+              <span class="profile-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="8" r="4"></circle>
+                  <path d="M4 20c0-4 3.2-7 8-7s8 3 8 7"></path>
+                </svg>
+              </span>
+              <strong>{{ authService.currentUser?.nombreCompleto }}</strong>
+            </button>
+            <button
+              type="button"
+              class="badge badge-role"
+              (click)="abrirModalCambioPassword()"
+              [disabled]="!authService.currentUser"
+              title="Cambiar contraseña"
+            >
+              {{ authService.currentUser?.rol }}
+            </button>
+          </div>
+        </header>
+
+        <section class="content-body">
+          <router-outlet></router-outlet>
+        </section>
+
+        <div class="modal-backdrop" *ngIf="modalCambioPasswordAbierto">
+          <section class="modal-card" role="dialog" aria-modal="true" aria-label="Cambiar contraseña">
+            <p class="modal-text" *ngIf="authService.currentUser as user">
+              Usuario: <strong>{{ user.nombreCompleto }}</strong>
+              ({{ user.run }})
+            </p>
+
+            <ng-container *ngIf="authService.currentUser as user">
+              <h3 *ngIf="vistaModalCuenta === 'OPCIONES'">Opciones de cuenta</h3>
+              <h3 *ngIf="vistaModalCuenta === 'PASSWORD'">Cambiar contraseña</h3>
+              <h3 *ngIf="vistaModalCuenta === 'TRANSFER'">Traspasar cuenta Administrador Master</h3>
+
+              <section class="account-options" *ngIf="user.esMaster && vistaModalCuenta === 'OPCIONES'">
+                <button type="button" class="account-option-card" (click)="abrirVistaCambioPassword()">
+                  <strong>Cambiar contraseña</strong>
+                  <span>Actualiza tu contraseña actual de acceso.</span>
+                </button>
+                <button type="button" class="account-option-card danger" (click)="abrirVistaTransferMaster()">
+                  <strong>Traspasar cuenta Master</strong>
+                  <span>Transfiere el control master a otro usuario activo.</span>
+                </button>
+              </section>
+
+              <form
+                *ngIf="vistaModalCuenta === 'PASSWORD'"
+                [formGroup]="formCambioPassword"
+                (ngSubmit)="confirmarCambioPassword()"
+                class="page-grid"
+              >
+                <div>
+                  <label>Contraseña actual</label>
+                  <div class="password-field">
+                    <input
+                      formControlName="passwordActual"
+                      [type]="mostrarPasswordActual ? 'text' : 'password'"
+                      [appProgressivePasswordMask]="!mostrarPasswordActual"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      (click)="mostrarPasswordActual = !mostrarPasswordActual"
+                    >
+                      {{ mostrarPasswordActual ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label>Nueva contraseña</label>
+                  <div class="password-field">
+                    <input
+                      formControlName="nuevaPassword"
+                      [type]="mostrarPasswordNueva ? 'text' : 'password'"
+                      [appProgressivePasswordMask]="!mostrarPasswordNueva"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      (click)="mostrarPasswordNueva = !mostrarPasswordNueva"
+                    >
+                      {{ mostrarPasswordNueva ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
+                  <p
+                    class="error-text"
+                    *ngIf="formCambioPassword.get('nuevaPassword')?.invalid && formCambioPassword.get('nuevaPassword')?.touched"
+                  >
+                    Debe tener 10+ caracteres, mayúscula, minúscula, número y símbolo.
+                  </p>
+                </div>
+
+                <div>
+                  <label>Confirmar nueva contraseña</label>
+                  <div class="password-field">
+                    <input
+                      formControlName="confirmarPassword"
+                      [type]="mostrarPasswordConfirmar ? 'text' : 'password'"
+                      [appProgressivePasswordMask]="!mostrarPasswordConfirmar"
+                    />
+                    <button
+                      type="button"
+                      class="password-toggle"
+                      (click)="mostrarPasswordConfirmar = !mostrarPasswordConfirmar"
+                    >
+                      {{ mostrarPasswordConfirmar ? 'Ocultar' : 'Mostrar' }}
+                    </button>
+                  </div>
+                  <p
+                    class="error-text"
+                    *ngIf="passwordsNoCoinciden && formCambioPassword.get('confirmarPassword')?.touched"
+                  >
+                    La confirmación no coincide con la nueva contraseña.
+                  </p>
+                </div>
+
+                <div class="modal-actions">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingCambioPassword"
+                    (click)="cerrarModalCambioPassword()"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    *ngIf="user.esMaster"
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingCambioPassword"
+                    (click)="volverOpcionesCuenta()"
+                  >
+                    Volver
+                  </button>
+                  <button class="btn-primary" [disabled]="loadingCambioPassword">
+                    {{ loadingCambioPassword ? 'Actualizando...' : 'Actualizar contraseña' }}
+                  </button>
+                </div>
+              </form>
+
+              <section class="master-transfer" *ngIf="user.esMaster && vistaModalCuenta === 'TRANSFER'">
+                <p>
+                  Selecciona al usuario que recibirá la cuenta master. Esta acción te quitará el estado master a ti.
+                </p>
+
+                <form [formGroup]="formCambioPassword" class="page-grid">
+                  <div>
+                    <label>Contraseña actual</label>
+                    <div class="password-field">
+                      <input
+                        formControlName="passwordActual"
+                        [type]="mostrarPasswordActual ? 'text' : 'password'"
+                        [appProgressivePasswordMask]="!mostrarPasswordActual"
+                      />
+                      <button
+                        type="button"
+                        class="password-toggle"
+                        (click)="mostrarPasswordActual = !mostrarPasswordActual"
+                      >
+                        {{ mostrarPasswordActual ? 'Ocultar' : 'Mostrar' }}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                <div>
+                  <label>Usuario destino</label>
+                  <select [(ngModel)]="targetMasterUserId" [ngModelOptions]="{ standalone: true }">
+                    <option value="">Seleccionar usuario</option>
+                    <option *ngFor="let candidato of masterCandidates" [value]="candidato.id">
+                      {{ candidato.nombreCompleto }} ({{ candidato.rol }}) - {{ candidato.run }}
+                    </option>
+                  </select>
+                  <p class="modal-text" *ngIf="!masterCandidates.length">
+                    No hay usuarios activos disponibles para recibir la cuenta master.
+                  </p>
+                </div>
+
+                <div class="modal-actions">
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingTransferMaster"
+                    (click)="volverOpcionesCuenta()"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-secondary"
+                    [disabled]="loadingTransferMaster"
+                    (click)="cerrarModalCambioPassword()"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-danger-outline"
+                    [disabled]="loadingTransferMaster || !masterCandidates.length"
+                    (click)="confirmarTransferMaster()"
+                  >
+                    {{ loadingTransferMaster ? 'Traspasando...' : 'Traspasar Master' }}
+                  </button>
+                </div>
+              </section>
+
+              <div class="modal-actions" *ngIf="user.esMaster && vistaModalCuenta === 'OPCIONES'">
+                <button type="button" class="btn-secondary" (click)="cerrarModalCambioPassword()">Cerrar</button>
+              </div>
+            </ng-container>
+          </section>
+        </div>
+
+        <app-alert-modal
+          [open]="alertPerfilAbierto"
+          [title]="alertPerfilTitulo"
+          [message]="alertPerfilMensaje"
+          [variant]="alertPerfilTipo"
+          (accepted)="cerrarAlertaPerfil()"
+        />
+      </main>
+    </div>
+  

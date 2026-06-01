@@ -1,0 +1,71 @@
+- generic [ref=e4]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Sistema Migratorio" [level=1] [ref=e8]
+      - paragraph [ref=e9]: Bienvenido al Sistema Web de Control Migratorio, plataforma para el registro, consulta y seguimiento.
+    - generic [ref=e10]:
+      - heading "Iniciar sesión" [level=2] [ref=e11]
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: Usuario
+          - textbox "12.345.678-5" [ref=e15]: 21.000.008-9
+        - generic [ref=e16]:
+          - generic [ref=e17]: Clave
+          - generic [ref=e18]:
+            - textbox "••••••••" [ref=e19]: Demo123*
+            - button "Mostrar" [ref=e20] [cursor=pointer]
+        - generic [ref=e21]:
+          - checkbox "Recordar sesión en este equipo" [ref=e22]
+          - generic [ref=e23]: Recordar sesión en este equipo
+        - button "Ingresar" [ref=e24] [cursor=pointer]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - generic [ref=e28]: Accesos rápidos
+            - strong [ref=e29]: Perfiles de desarrollo
+          - generic [ref=e30]: Sin digitar RUN ni clave
+        - generic [ref=e31]:
+          - button "Administrador Master Control total del sistema 15.960.680-5" [ref=e32] [cursor=pointer]:
+            - generic [ref=e33]: Administrador Master
+            - generic [ref=e34]: Control total del sistema
+            - emphasis [ref=e35]: 15.960.680-5
+          - button "Admin Tarapacá Administrador operativo JAF 21.000.001-1" [ref=e36] [cursor=pointer]:
+            - generic [ref=e37]: Admin Tarapacá
+            - generic [ref=e38]: Administrador operativo JAF
+            - emphasis [ref=e39]: 21.000.001-1
+          - button "Admin Antofagasta Administrador operativo JAF 21.000.002-K" [ref=e40] [cursor=pointer]:
+            - generic [ref=e41]: Admin Antofagasta
+            - generic [ref=e42]: Administrador operativo JAF
+            - emphasis [ref=e43]: 21.000.002-K
+          - button "Admin Arica Administrador operativo JAF 21.000.003-8" [ref=e44] [cursor=pointer]:
+            - generic [ref=e45]: Admin Arica
+            - generic [ref=e46]: Administrador operativo JAF
+            - emphasis [ref=e47]: 21.000.003-8
+          - button "Operador Tarapacá Registro y gestión de casos 21.000.004-6" [ref=e48] [cursor=pointer]:
+            - generic [ref=e49]: Operador Tarapacá
+            - generic [ref=e50]: Registro y gestión de casos
+            - emphasis [ref=e51]: 21.000.004-6
+          - button "Operador Antofagasta Registro y gestión de casos 21.000.005-4" [ref=e52] [cursor=pointer]:
+            - generic [ref=e53]: Operador Antofagasta
+            - generic [ref=e54]: Registro y gestión de casos
+            - emphasis [ref=e55]: 21.000.005-4
+          - button "Operador Arica Registro y gestión de casos 21.000.006-2" [ref=e56] [cursor=pointer]:
+            - generic [ref=e57]: Operador Arica
+            - generic [ref=e58]: Registro y gestión de casos
+            - emphasis [ref=e59]: 21.000.006-2
+          - button "Auditor Consulta y trazabilidad 21.000.007-0" [ref=e60] [cursor=pointer]:
+            - generic [ref=e61]: Auditor
+            - generic [ref=e62]: Consulta y trazabilidad
+            - emphasis [ref=e63]: 21.000.007-0
+          - button "Carabineros Mesa de trabajo institucional 21.000.008-9" [ref=e64] [cursor=pointer]:
+            - generic [ref=e65]: Carabineros
+            - generic [ref=e66]: Mesa de trabajo institucional
+            - emphasis [ref=e67]: 21.000.008-9
+          - button "PDI Recepción y cierre investigativo 21.000.009-7" [ref=e68] [cursor=pointer]:
+            - generic [ref=e69]: PDI
+            - generic [ref=e70]: Recepción y cierre investigativo
+            - emphasis [ref=e71]: 21.000.009-7
+  - generic [ref=e73]:
+    - heading "Acceso no válido" [level=3] [ref=e74]
+    - paragraph [ref=e75]: No hay conexión con el servidor. Intenta nuevamente.
+    - button "Cerrar" [ref=e76] [cursor=pointer]

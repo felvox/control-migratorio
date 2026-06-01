@@ -16,81 +16,38 @@ import { CreateCasoDto } from './dto/create-caso.dto';
 import { QueryCasosDto } from './dto/query-casos.dto';
 import { UpdateCasoDto } from './dto/update-caso.dto';
 import { CambiarEstadoCasoDto } from './dto/cambiar-estado-caso.dto';
+import { AddObservacionInstitucionalDto } from './dto/add-observacion-institucional.dto';
+import {
+  CerrarPdiDto,
+  PdiResultado,
+} from './dto/cerrar-pdi.dto';
 import { AuthUser } from '../../common/interfaces/auth-user.interface';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import {
+  resolverJafParaActualizacion,
+  resolverJafParaCreacion,
+  tieneRestriccionPorJaf,
+  validarAccesoCaso,
+  validarGestionSoloCreador,
+  validarGestionMasterSobreCaso,
+  validarEtapaGestionInstitucional,
+  validarRolFlujo,
+} from './casos-acceso-policy.utils';
+import {
+  agregarLineaObservacion,
+  construirLineaObservacionInstitucional,
+  construirLineaResolucionPdi,
+  resolverFlujo,
+  resolverResultadoPdi,
+} from './casos-flujo.utils';
+import { resolverFiltroDerivacionPorRol } from './casos-listado-policy.utils';
 
 @Injectable()
 export class CasosService {
-  private readonly rolesConRestriccionJaf = new Set<Role>([
-    Role.OPERADOR,
-    Role.CONSULTA,
-  ]);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoriaService: AuditoriaService,
   ) {}
-
-  private tieneRestriccionPorJaf(user: AuthUser): boolean {
-    return (
-      this.rolesConRestriccionJaf.has(user.role) ||
-      (user.role === Role.ADMINISTRADOR && !user.esMaster)
-    );
-  }
-
-  private resolverJafParaCreacion(dtoJaf: Jaf | undefined, user: AuthUser): Jaf {
-    if (this.tieneRestriccionPorJaf(user)) {
-      if (!user.jaf) {
-        throw new ForbiddenException(
-          'Usuario sin JAF asignada. Contacte a un administrador.',
-        );
-      }
-
-      return user.jaf;
-    }
-
-    if (dtoJaf) {
-      return dtoJaf;
-    }
-
-    if (user.jaf) {
-      return user.jaf;
-    }
-
-    return Jaf.TARAPACA;
-  }
-
-  private resolverJafParaActualizacion(
-    dtoJaf: Jaf | undefined,
-    user: AuthUser,
-    jafActual: Jaf,
-  ): Jaf {
-    if (this.tieneRestriccionPorJaf(user)) {
-      if (!user.jaf) {
-        throw new ForbiddenException(
-          'Usuario sin JAF asignada. Contacte a un administrador.',
-        );
-      }
-
-      return user.jaf;
-    }
-
-    return dtoJaf ?? jafActual;
-  }
-
-  private resolverFlujo(existenMenores: boolean) {
-    if (existenMenores) {
-      return {
-        estado: EstadoCaso.DERIVADO_CARABINEROS,
-        institucionDerivacion: InstitucionDerivacion.CARABINEROS,
-      };
-    }
-
-    return {
-      estado: EstadoCaso.DERIVADO_PDI,
-      institucionDerivacion: InstitucionDerivacion.PDI,
-    };
-  }
 
   private async generarCodigoCaso(): Promise<string> {
     for (let i = 0; i < 5; i += 1) {
@@ -110,17 +67,30 @@ export class CasosService {
     return `CM-${Date.now()}`;
   }
 
-  private validarAcceso(
-    caso: { creadoPorId: string; jaf: Jaf },
-    user: AuthUser,
-  ) {
-    if (this.tieneRestriccionPorJaf(user)) {
-      if (!user.jaf || caso.jaf !== user.jaf) {
-        throw new ForbiddenException(
-          'No tiene permisos para acceder a casos de otra JAF',
-        );
-      }
+
+  private async obtenerCasoParaFlujo(id: string) {
+    const caso = await this.prisma.caso.findFirst({
+      where: {
+        id,
+        eliminadoAt: null,
+      },
+      select: {
+        id: true,
+        codigo: true,
+        estado: true,
+        institucionDerivacion: true,
+        creadoPorId: true,
+        jaf: true,
+        existenMenores: true,
+        observaciones: true,
+      },
+    });
+
+    if (!caso) {
+      throw new NotFoundException('Caso no encontrado');
     }
+
+    return caso;
   }
 
   async crear(
@@ -136,8 +106,8 @@ export class CasosService {
       );
 
     const vieneAcompanadoDetectado = dto.vieneAcompanado || dto.personas.length > 1;
-    const flujo = this.resolverFlujo(existenMenoresDetectados);
-    const jafCaso = this.resolverJafParaCreacion(dto.jaf, user);
+    const flujo = resolverFlujo(existenMenoresDetectados);
+    const jafCaso = resolverJafParaCreacion(dto.jaf, user);
     const codigo = await this.generarCodigoCaso();
 
     const caso = await this.prisma.$transaction(async (tx) => {
@@ -204,18 +174,20 @@ export class CasosService {
     const limite = query.limite ?? 20;
     const skip = (pagina - 1) * limite;
 
-    if (this.tieneRestriccionPorJaf(user) && !user.jaf) {
+    if (tieneRestriccionPorJaf(user) && !user.jaf) {
       throw new ForbiddenException(
         'Usuario sin JAF asignada. Contacte a un administrador.',
       );
     }
+
+    const filtroDerivacionPorRol = resolverFiltroDerivacionPorRol(user, query);
 
     const where: Prisma.CasoWhereInput = {
       eliminadoAt: null,
       estado: query.estado,
       tipoControl: query.tipoControl,
       jaf:
-        this.tieneRestriccionPorJaf(user)
+        tieneRestriccionPorJaf(user)
           ? user.jaf ?? undefined
           : query.jaf,
       creadoPorId: query.operadorId ? query.operadorId : undefined,
@@ -231,6 +203,16 @@ export class CasosService {
               gte: query.fechaDesde ? new Date(query.fechaDesde) : undefined,
               lte: query.fechaHasta ? new Date(query.fechaHasta) : undefined,
             }
+          : undefined,
+      existenMenores:
+        typeof query.existenMenores === 'boolean'
+          ? query.existenMenores
+          : undefined,
+      institucionDerivacion:
+        user.role !== Role.CARABINEROS &&
+        user.role !== Role.PDI &&
+        query.institucionDerivacion
+          ? query.institucionDerivacion
           : undefined,
       personas:
         query.nombre || query.documento || query.nacionalidad
@@ -257,6 +239,7 @@ export class CasosService {
               },
             }
           : undefined,
+      ...filtroDerivacionPorRol,
     };
 
     const [total, items] = await Promise.all([
@@ -330,7 +313,7 @@ export class CasosService {
       throw new NotFoundException('Caso no encontrado');
     }
 
-    this.validarAcceso(caso, user);
+    validarAccesoCaso(caso, user);
 
     return caso;
   }
@@ -351,6 +334,8 @@ export class CasosService {
         codigo: true,
         creadoPorId: true,
         jaf: true,
+        estado: true,
+        institucionDerivacion: true,
         existenMenores: true,
       },
     });
@@ -359,7 +344,15 @@ export class CasosService {
       throw new NotFoundException('Caso no encontrado');
     }
 
-    this.validarAcceso(caso, user);
+    validarAccesoCaso(caso, user);
+    validarGestionMasterSobreCaso(caso, user);
+    validarGestionSoloCreador(caso, user, 'editar este caso');
+
+    if (caso.estado !== EstadoCaso.PENDIENTE) {
+      throw new ForbiddenException(
+        'Solo se puede editar un caso pendiente. Los casos derivados quedan solo para consulta.',
+      );
+    }
 
     const existenMenoresDetectados =
       dto.existenMenores ??
@@ -370,8 +363,8 @@ export class CasosService {
           )
         : caso.existenMenores);
 
-    const flujo = this.resolverFlujo(existenMenoresDetectados);
-    const jafCaso = this.resolverJafParaActualizacion(dto.jaf, user, caso.jaf);
+    const flujo = resolverFlujo(existenMenoresDetectados);
+    const jafCaso = resolverJafParaActualizacion(dto.jaf, user, caso.jaf);
 
     const dataBase: Prisma.CasoUpdateInput = {
       jaf: jafCaso,
@@ -387,9 +380,12 @@ export class CasosService {
       observaciones: dto.observaciones,
       vieneAcompanado: dto.vieneAcompanado,
       existenMenores: dto.existenMenores ?? existenMenoresDetectados,
-      estado: dto.estado ?? flujo.estado,
+      estado: dto.estado ?? caso.estado,
       institucionDerivacion:
-        dto.institucionDerivacion ?? flujo.institucionDerivacion,
+        dto.institucionDerivacion ??
+        (caso.estado === EstadoCaso.PENDIENTE
+          ? flujo.institucionDerivacion
+          : caso.institucionDerivacion),
       actualizadoPor: {
         connect: {
           id: user.id,
@@ -442,6 +438,12 @@ export class CasosService {
     user: AuthUser,
     meta?: { ip?: string; userAgent?: string },
   ) {
+    if (user.role !== Role.ADMINISTRADOR || !user.esMaster) {
+      throw new ForbiddenException(
+        'Solo el Administrador Master puede cambiar estado manualmente',
+      );
+    }
+
     const caso = await this.prisma.caso.findFirst({
       where: {
         id,
@@ -452,6 +454,7 @@ export class CasosService {
         codigo: true,
         creadoPorId: true,
         jaf: true,
+        institucionDerivacion: true,
       },
     });
 
@@ -459,7 +462,7 @@ export class CasosService {
       throw new NotFoundException('Caso no encontrado');
     }
 
-    this.validarAcceso(caso, user);
+    validarAccesoCaso(caso, user);
 
     const actualizado = await this.prisma.caso.update({
       where: { id },
@@ -489,6 +492,331 @@ export class CasosService {
     });
 
     return actualizado;
+  }
+
+  async agregarObservacionInstitucional(
+    id: string,
+    dto: AddObservacionInstitucionalDto,
+    user: AuthUser,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    validarRolFlujo(user, [Role.CARABINEROS, Role.PDI]);
+
+    const caso = await this.prisma.caso.findFirst({
+      where: {
+        id,
+        eliminadoAt: null,
+      },
+      select: {
+        id: true,
+        codigo: true,
+        creadoPorId: true,
+        jaf: true,
+        estado: true,
+        institucionDerivacion: true,
+        existenMenores: true,
+        observaciones: true,
+      },
+    });
+
+    if (!caso) {
+      throw new NotFoundException('Caso no encontrado');
+    }
+
+    validarAccesoCaso(caso, user);
+    validarGestionMasterSobreCaso(caso, user);
+    validarEtapaGestionInstitucional(caso, user);
+
+    const observacion = dto.observacion.trim();
+    const fechaMarca = new Date().toISOString();
+    const linea = construirLineaObservacionInstitucional(
+      user.role,
+      observacion,
+      fechaMarca,
+    );
+    const observacionesActualizadas = agregarLineaObservacion(
+      caso.observaciones,
+      linea,
+    );
+
+    const actualizado = await this.prisma.caso.update({
+      where: { id: caso.id },
+      data: {
+        observaciones: observacionesActualizadas,
+        actualizadoPorId: user.id,
+      },
+      select: {
+        id: true,
+        observaciones: true,
+      },
+    });
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: user.id,
+      casoId: caso.id,
+      accion: 'AGREGAR_OBSERVACION_INSTITUCIONAL',
+      entidad: 'CASO',
+      entidadId: caso.id,
+      descripcion: `Observación institucional agregada al caso ${caso.codigo}`,
+      metadata: {
+        rol: user.role,
+        observacion,
+      },
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return actualizado;
+  }
+
+  async recepcionarEnCarabineros(
+    id: string,
+    user: AuthUser,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    validarRolFlujo(user, [Role.CARABINEROS]);
+
+    const caso = await this.obtenerCasoParaFlujo(id);
+    validarAccesoCaso(caso, user);
+    validarGestionMasterSobreCaso(caso, user);
+    validarGestionSoloCreador(caso, user, `enviar este caso a ${caso.institucionDerivacion}`);
+
+    if (caso.estado !== EstadoCaso.DERIVADO_CARABINEROS) {
+      throw new ForbiddenException(
+        'Solo se puede recepcionar en Carabineros un caso derivado a Carabineros',
+      );
+    }
+
+    await this.prisma.caso.update({
+      where: { id },
+      data: {
+        actualizadoPorId: user.id,
+      },
+    });
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: user.id,
+      casoId: id,
+      accion: 'RECEPCIONAR_CASO_CARABINEROS',
+      entidad: 'CASO',
+      entidadId: id,
+      descripcion: `Caso ${caso.codigo} recepcionado por Carabineros`,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return this.obtenerPorId(id, user);
+  }
+
+  async enviarDerivacionPendiente(
+    id: string,
+    user: AuthUser,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    validarRolFlujo(user, [Role.ADMINISTRADOR, Role.OPERADOR]);
+
+    const caso = await this.obtenerCasoParaFlujo(id);
+    validarAccesoCaso(caso, user);
+    validarGestionMasterSobreCaso(caso, user);
+
+    if (caso.estado !== EstadoCaso.PENDIENTE) {
+      throw new ForbiddenException(
+        'Solo se puede enviar un caso que está pendiente de derivación',
+      );
+    }
+
+    if (
+      caso.institucionDerivacion !== InstitucionDerivacion.CARABINEROS &&
+      caso.institucionDerivacion !== InstitucionDerivacion.PDI
+    ) {
+      throw new ForbiddenException(
+        'El caso no tiene una institución de derivación definida',
+      );
+    }
+
+    const estadoNuevo =
+      caso.institucionDerivacion === InstitucionDerivacion.CARABINEROS
+        ? EstadoCaso.DERIVADO_CARABINEROS
+        : EstadoCaso.DERIVADO_PDI;
+
+    await this.prisma.caso.update({
+      where: { id },
+      data: {
+        estado: estadoNuevo,
+        actualizadoPorId: user.id,
+      },
+    });
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: user.id,
+      casoId: id,
+      accion: 'ENVIAR_CASO_DERIVACION',
+      entidad: 'CASO',
+      entidadId: id,
+      descripcion: `Caso ${caso.codigo} enviado a ${caso.institucionDerivacion}`,
+      metadata: {
+        estadoAnterior: caso.estado,
+        estadoNuevo,
+        institucionDerivacion: caso.institucionDerivacion,
+      },
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return this.obtenerPorId(id, user);
+  }
+
+  async derivarDesdeCarabinerosAPdi(
+    id: string,
+    user: AuthUser,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    validarRolFlujo(user, [Role.CARABINEROS]);
+
+    const caso = await this.obtenerCasoParaFlujo(id);
+    validarAccesoCaso(caso, user);
+    validarGestionMasterSobreCaso(caso, user);
+
+    if (caso.estado !== EstadoCaso.DERIVADO_CARABINEROS) {
+      throw new ForbiddenException(
+        'Solo se puede derivar a PDI un caso derivado a Carabineros',
+      );
+    }
+
+    await this.prisma.caso.update({
+      where: { id },
+      data: {
+        estado: EstadoCaso.DERIVADO_PDI,
+        institucionDerivacion: InstitucionDerivacion.PDI,
+        actualizadoPorId: user.id,
+      },
+    });
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: user.id,
+      casoId: id,
+      accion: 'DERIVAR_CASO_A_PDI',
+      entidad: 'CASO',
+      entidadId: id,
+      descripcion: `Caso ${caso.codigo} derivado a PDI por Carabineros`,
+      metadata: {
+        estadoAnterior: caso.estado,
+        estadoNuevo: EstadoCaso.DERIVADO_PDI,
+      },
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return this.obtenerPorId(id, user);
+  }
+
+  async recepcionarEnPdi(
+    id: string,
+    user: AuthUser,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    validarRolFlujo(user, [Role.PDI]);
+
+    const caso = await this.obtenerCasoParaFlujo(id);
+    validarAccesoCaso(caso, user);
+    validarGestionMasterSobreCaso(caso, user);
+
+    if (caso.estado !== EstadoCaso.DERIVADO_PDI) {
+      throw new ForbiddenException(
+        'Solo se puede recepcionar en PDI un caso derivado a PDI',
+      );
+    }
+
+    await this.prisma.caso.update({
+      where: { id },
+      data: {
+        actualizadoPorId: user.id,
+      },
+    });
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: user.id,
+      casoId: id,
+      accion: 'RECEPCIONAR_CASO_PDI',
+      entidad: 'CASO',
+      entidadId: id,
+      descripcion: `Caso ${caso.codigo} recepcionado por PDI`,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return this.obtenerPorId(id, user);
+  }
+
+  async cerrarEnPdi(
+    id: string,
+    dto: CerrarPdiDto,
+    user: AuthUser,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
+    validarRolFlujo(user, [Role.PDI]);
+
+    const caso = await this.obtenerCasoParaFlujo(id);
+    validarAccesoCaso(caso, user);
+    validarGestionMasterSobreCaso(caso, user);
+
+    if (caso.estado !== EstadoCaso.DERIVADO_PDI) {
+      throw new ForbiddenException(
+        'Solo se puede cerrar en PDI un caso derivado a PDI',
+      );
+    }
+
+    const resultadoPdi = resolverResultadoPdi(dto);
+    const observaciones = dto.observaciones?.trim() || null;
+    const lineaResolucion = construirLineaObservacionInstitucional(
+      Role.PDI,
+      construirLineaResolucionPdi(dto, resultadoPdi),
+      new Date().toISOString(),
+    );
+    const observacionesActualizadas = agregarLineaObservacion(
+      caso.observaciones,
+      lineaResolucion,
+    );
+
+    await this.prisma.caso.update({
+      where: { id },
+      data: {
+        estado: EstadoCaso.CERRADO,
+        pdiOrdenJudicialVigente: dto.ordenJudicialVigente,
+        pdiSituacionMigratoria: dto.ordenJudicialVigente
+          ? null
+          : dto.situacionMigratoria ?? null,
+        pdiReconducible:
+          !dto.ordenJudicialVigente && dto.situacionMigratoria === 'INGRESO_PNH'
+            ? dto.reconducible ?? null
+            : null,
+        pdiResultado: resultadoPdi,
+        pdiObservacionesCierre: observaciones,
+        observaciones: observacionesActualizadas,
+        actualizadoPorId: user.id,
+      },
+    });
+
+    await this.auditoriaService.registrarAccion({
+      usuarioId: user.id,
+      casoId: id,
+      accion: 'CERRAR_CASO_PDI',
+      entidad: 'CASO',
+      entidadId: id,
+      descripcion: `Caso ${caso.codigo} cerrado por PDI`,
+      metadata: {
+        estadoAnterior: caso.estado,
+        estadoNuevo: EstadoCaso.CERRADO,
+        ordenJudicialVigente: dto.ordenJudicialVigente,
+        situacionMigratoria: dto.situacionMigratoria,
+        reconducible: dto.reconducible,
+        resultadoPdi,
+      },
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    return this.obtenerPorId(id, user);
   }
 
   async ultimosCasos(limit = 10) {

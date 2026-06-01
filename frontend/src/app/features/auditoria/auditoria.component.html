@@ -1,0 +1,243 @@
+<div class="page-grid">
+  <article class="card filtros-card">
+    <div class="filtros-grid">
+      <div>
+        <label>JAF</label>
+        <select [value]="filtroJaf" (change)="onJafChange($event)">
+          <option value="">Todas las JAF</option>
+          <option value="TARAPACA">JAF Tarapacá</option>
+          <option value="ANTOFAGASTA">JAF Antofagasta</option>
+          <option value="ARICA_PARINACOTA">JAF Arica y Parinacota</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Rol</label>
+        <select [value]="filtroRol" (change)="onRolChange($event)">
+          <option value="">Todos los roles</option>
+          <option *ngFor="let rol of roles" [value]="rol">
+            {{ etiquetaRol(rol) }}
+          </option>
+        </select>
+      </div>
+
+      <div>
+        <label>Usuario</label>
+        <select [value]="filtroUsuarioId" (change)="onUsuarioChange($event)">
+          <option value="">Todos los usuarios</option>
+          <option *ngFor="let usuario of usuariosFiltrables" [value]="usuario.id">
+            {{ etiquetaUsuarioFiltro(usuario) }}
+          </option>
+        </select>
+      </div>
+
+      <div>
+        <label>Acción</label>
+        <select [value]="filtroAccionKey" (change)="onAccionChange($event)">
+          <option *ngFor="let accion of acciones" [value]="accion.key">
+            {{ accion.label }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <div class="filtros-actions">
+      <button type="button" class="btn-secondary" (click)="limpiarFiltros()">
+        Limpiar filtros
+      </button>
+    </div>
+  </article>
+
+  <article class="card table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Descripción</th>
+          <th>Persona involucrada</th>
+          <th>Usuario</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of items">
+          <td>{{ item.fechaHora | date: 'dd/MM/yyyy HH:mm' }}</td>
+          <td>{{ descripcionVisible(item) }}</td>
+          <td>{{ personaInvolucrada(item) }}</td>
+          <td>{{ item.usuario?.nombreCompleto || '-' }}</td>
+          <td>{{ ipVisible(item.ip) }}</td>
+        </tr>
+        <tr *ngIf="!items.length">
+          <td colspan="5" class="empty-cell">
+            No hay actividad para los filtros seleccionados.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </article>
+</div>
+
+<div
+  class="confirm-backdrop"
+  *ngIf="modalUsuariosActivosAbierto"
+  (click)="cerrarModalUsuariosActivos()"
+>
+  <section class="confirm-modal confirm-modal-wide" (click)="$event.stopPropagation()">
+    <div class="modal-header-row">
+      <h3>
+        {{ filtroEstadoConexion === 'ACTIVOS' ? 'Usuarios activos' : 'Usuarios desconectados' }}
+      </h3>
+      <div class="modal-header-actions">
+        <button type="button" class="btn-secondary" (click)="recargarSesionesActivas()">
+          Actualizar
+        </button>
+      </div>
+    </div>
+
+    <p class="modal-summary" *ngIf="!cargandoSesionesActivas">
+      {{ resumenSesiones.totalActivos }} activos ·
+      {{ resumenSesiones.totalDesconectados }} desconectados ·
+      {{ resumenSesiones.totalUsuarios }} usuario(s)
+    </p>
+
+    <p class="modal-summary" *ngIf="cargandoSesionesActivas">
+      Cargando usuarios activos...
+    </p>
+
+    <div class="modal-table-wrap" *ngIf="!cargandoSesionesActivas">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Rol</th>
+            <th>JAF</th>
+            <th>Última actividad</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let sesion of usuariosConexion">
+            <td>{{ sesion.usuario.nombreCompleto }}</td>
+            <td>{{ etiquetaRol(sesion.usuario.rol) }}</td>
+            <td>{{ etiquetaJaf(sesion.usuario.jaf) }}</td>
+            <td>
+              {{
+                sesion.ultimaActividadAt
+                  ? (sesion.ultimaActividadAt | date: 'dd/MM/yyyy HH:mm')
+                  : '-'
+              }}
+            </td>
+            <td>
+              <span
+                class="estado-chip"
+                [class.estado-chip--activo]="sesion.estadoConexion === 'ACTIVO'"
+                [class.estado-chip--desconectado]="sesion.estadoConexion === 'DESCONECTADO'"
+              >
+                {{ etiquetaEstadoSesion(sesion.estadoConexion) }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="!usuariosConexion.length">
+            <td colspan="5" class="empty-cell">
+              No hay usuarios para el estado seleccionado.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="confirm-actions">
+      <button type="button" class="btn-primary" (click)="cerrarModalUsuariosActivos()">
+        Cerrar
+      </button>
+    </div>
+  </section>
+</div>
+
+<div
+  class="confirm-backdrop"
+  *ngIf="modalEventosSeguridadAbierto"
+  (click)="cerrarModalEventosSeguridad()"
+>
+  <section class="confirm-modal confirm-modal-wide" (click)="$event.stopPropagation()">
+    <div class="modal-header-row">
+      <h3>Eventos de Seguridad</h3>
+      <div class="modal-header-actions">
+        <button
+          type="button"
+          class="btn-secondary"
+          [class.btn-primary]="filtroEventosSeguridad === 'PENDIENTES'"
+          (click)="cambiarFiltroEventosSeguridad('PENDIENTES')"
+        >
+          Pendientes
+        </button>
+        <button
+          type="button"
+          class="btn-secondary"
+          [class.btn-primary]="filtroEventosSeguridad === 'REVISADOS'"
+          (click)="cambiarFiltroEventosSeguridad('REVISADOS')"
+        >
+          Revisados
+        </button>
+        <button
+          type="button"
+          class="btn-secondary"
+          *ngIf="filtroEventosSeguridad === 'PENDIENTES' && eventosSeguridad.length"
+          (click)="marcarPendientesComoRevisados()"
+        >
+          Marcar revisados
+        </button>
+        <button type="button" class="btn-secondary" (click)="recargarEventosSeguridad()">
+          Actualizar
+        </button>
+      </div>
+    </div>
+
+    <p class="modal-summary" *ngIf="!cargandoEventosSeguridad">
+      {{ eventosSeguridad.length }} evento(s)
+      {{ filtroEventosSeguridad === 'PENDIENTES' ? 'pendiente(s) de revisión' : 'revisado(s)' }}
+    </p>
+
+    <p class="modal-summary" *ngIf="cargandoEventosSeguridad">
+      Cargando eventos de seguridad...
+    </p>
+
+    <div class="modal-table-wrap" *ngIf="!cargandoEventosSeguridad">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Evento</th>
+            <th>Descripción</th>
+            <th>Usuario</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of eventosSeguridad">
+            <td>{{ item.fechaHora | date: 'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ etiquetaAccionSeguridad(item.accion) }}</td>
+            <td>{{ item.descripcion || '-' }}</td>
+            <td>{{ item.usuario?.nombreCompleto || '-' }}</td>
+            <td>{{ ipVisible(item.ip) }}</td>
+          </tr>
+          <tr *ngIf="!eventosSeguridad.length">
+            <td colspan="5" class="empty-cell">
+              {{
+                filtroEventosSeguridad === 'PENDIENTES'
+                  ? 'No hay eventos de seguridad pendientes.'
+                  : 'No hay eventos de seguridad revisados.'
+              }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="confirm-actions">
+      <button type="button" class="btn-primary" (click)="cerrarModalEventosSeguridad()">
+        Cerrar
+      </button>
+    </div>
+  </section>
+</div>

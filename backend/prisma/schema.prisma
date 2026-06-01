@@ -12,6 +12,8 @@ enum Role {
   OPERADOR
   CONSULTA
   AUDITOR
+  CARABINEROS
+  PDI
 }
 
 enum Jaf {
@@ -50,6 +52,29 @@ enum InstitucionDerivacion {
   PDI
 }
 
+enum MotivoCierreSesion {
+  LOGOUT
+  INACTIVIDAD
+  EXPIRACION
+  FORZADO
+}
+
+enum FeedbackPrioridad {
+  BAJA
+  MEDIA
+  ALTA
+}
+
+enum FeedbackEstado {
+  PENDIENTE
+  REVISADO
+}
+
+enum FeedbackDireccion {
+  A_MASTER
+  A_OPERATIVOS
+}
+
 model Usuario {
   id                        String              @id @default(uuid())
   run                       String              @unique
@@ -69,7 +94,10 @@ model Usuario {
   evidenciasCreadas         Evidencia[]         @relation("EvidenciaCreadaPor")
   documentosGenerados       DocumentoGenerado[] @relation("DocumentoGeneradoPor")
   auditorias                Auditoria[]
+  auditoriasSeguridadRevisadas Auditoria[]      @relation("AuditoriaSeguridadRevisadaPor")
   sesiones                  SesionAcceso[]
+  feedbackEnviados          Feedback[]          @relation("FeedbackCreadoPor")
+  feedbackRevisados         Feedback[]          @relation("FeedbackRevisadoPor")
 
   @@index([rol])
   @@index([esMaster])
@@ -93,6 +121,11 @@ model Caso {
   existenMenores           Boolean               @default(false)
   institucionDerivacion    InstitucionDerivacion @default(NINGUNA)
   estado                   EstadoCaso            @default(PENDIENTE)
+  pdiOrdenJudicialVigente  Boolean?
+  pdiSituacionMigratoria   String?
+  pdiReconducible          Boolean?
+  pdiResultado             String?
+  pdiObservacionesCierre   String?
   creadoPorId              String
   actualizadoPorId         String?
   creadoAt                 DateTime              @default(now())
@@ -182,32 +215,63 @@ model Auditoria {
   id          String   @id @default(uuid())
   usuarioId   String?
   casoId      String?
+  seguridadRevisadoPorId String?
   accion      String
   entidad     String
   entidadId   String?
   descripcion String?
   metadata    Json?
   fechaHora   DateTime @default(now())
+  seguridadRevisadoAt DateTime?
   ip          String?
   userAgent   String?
   usuario     Usuario? @relation(fields: [usuarioId], references: [id])
   caso        Caso?    @relation("CasoAuditoria", fields: [casoId], references: [id])
+  seguridadRevisadoPor Usuario? @relation("AuditoriaSeguridadRevisadaPor", fields: [seguridadRevisadoPorId], references: [id])
 
   @@index([fechaHora])
   @@index([accion])
   @@index([entidad, entidadId])
   @@index([usuarioId])
+  @@index([seguridadRevisadoAt])
+  @@index([seguridadRevisadoPorId])
 }
 
 model SesionAcceso {
   id           String    @id @default(uuid())
   usuarioId    String
   inicioSesion DateTime  @default(now())
+  ultimaActividadAt DateTime @default(now())
   cierreSesion DateTime?
+  motivoCierre MotivoCierreSesion?
   ip           String?
   userAgent    String?
   usuario      Usuario   @relation(fields: [usuarioId], references: [id])
 
   @@index([inicioSesion])
+  @@index([ultimaActividadAt])
+  @@index([cierreSesion])
+  @@index([usuarioId])
+}
+
+model Feedback {
+  id            String            @id @default(uuid())
+  asunto        String
+  mensaje       String
+  prioridad     FeedbackPrioridad @default(MEDIA)
+  estado        FeedbackEstado    @default(PENDIENTE)
+  direccion     FeedbackDireccion @default(A_MASTER)
+  jaf           Jaf
+  jafDestino    Jaf?
+  usuarioId     String
+  revisadoPorId String?
+  creadoAt      DateTime          @default(now())
+  revisadoAt    DateTime?
+  usuario       Usuario           @relation("FeedbackCreadoPor", fields: [usuarioId], references: [id])
+  revisadoPor   Usuario?          @relation("FeedbackRevisadoPor", fields: [revisadoPorId], references: [id])
+
+  @@index([estado])
+  @@index([jaf])
+  @@index([creadoAt])
   @@index([usuarioId])
 }

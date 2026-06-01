@@ -1,0 +1,13 @@
+[      44ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[     130ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63825
+[     158ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0
+[  120841ms] [INFO] [webpack-dev-server] App updated. Recompiling... @ http://127.0.0.1:4200/polyfills.js:2002
+[  122658ms] [INFO] [webpack-dev-server] App updated. Reloading... @ http://127.0.0.1:4200/polyfills.js:2002
+[  122777ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[  122967ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63894
+[  123057ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0
+[  138995ms] [INFO] [webpack-dev-server] App updated. Recompiling... @ http://127.0.0.1:4200/polyfills.js:2002
+[  140112ms] [INFO] [webpack-dev-server] App updated. Reloading... @ http://127.0.0.1:4200/polyfills.js:2002
+[  140245ms] [INFO] [webpack-dev-server] Server started: Hot Module Replacement disabled, Live Reloading enabled, Progress disabled, Overlay enabled. @ http://127.0.0.1:4200/polyfills.js:2002
+[  140424ms] [LOG] Angular is running in development mode. @ http://127.0.0.1:4200/main.js:63920
+[  140504ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/api/casos/c683acd7-743b-4863-a044-f6e89966cdda:0

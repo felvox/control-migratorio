@@ -1,0 +1,1266 @@
+    <div
+      class="detalle-caso page-grid"
+	      *ngIf="caso"
+	      [class.detalle-caso--carabineros]="esPerfilInstitucional"
+	    >
+      <section class="card hero-card">
+        <div class="hero-main">
+	          <p class="hero-eyebrow">
+	            {{ esPerfilInstitucional ? tituloMesaTrabajo : 'Detalle operativo' }}
+	          </p>
+          <h2>{{ caso.codigo }}</h2>
+          <p class="hero-subtitle">
+            {{ etiquetaTipoControl(caso.tipoControl) }}
+            · {{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}
+            · {{ caso.lugar }}
+          </p>
+          <div class="hero-chips">
+            <span class="status-chip" [ngClass]="estadoClase(caso.estado)">
+              {{ etiquetaEstadoCorta }}
+            </span>
+            <span class="meta-chip" *ngIf="etiquetaDerivacionPendiente">
+              {{ etiquetaDerivacionPendiente }}
+            </span>
+            <span class="meta-chip">{{ etiquetaJaf(caso.jaf) }}</span>
+	            <span class="meta-chip" *ngIf="esPerfilInstitucional">{{ composicionCaso }}</span>
+            <span class="meta-chip">
+              Creado: {{ caso.creadoAt | date: 'dd/MM/yyyy HH:mm' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="hero-actions">
+          <button
+            class="btn-primary"
+            *ngIf="puedeGenerarPdf"
+            [disabled]="loadingPdf"
+            (click)="generarActa()"
+          >
+            {{ loadingPdf ? 'Generando...' : 'Generar PDF' }}
+          </button>
+          <button
+            class="btn-secondary"
+            *ngIf="puedeEditar"
+            [routerLink]="['/casos', caso.id, 'editar']"
+          >
+            Editar
+          </button>
+          <button class="btn-secondary" [routerLink]="['/casos']">Volver</button>
+        </div>
+      </section>
+
+	      <ng-container *ngIf="esPerfilCarabineros; else detalleNoCarabineros">
+        <section class="work-status-grid">
+          <article class="work-status-card">
+            <span>Responsable actual</span>
+            <strong>{{ responsableActual }}</strong>
+          </article>
+          <article class="work-status-card">
+            <span>Siguiente etapa</span>
+            <strong>{{ siguienteEtapa }}</strong>
+          </article>
+          <article class="work-status-card">
+            <span>Composición</span>
+            <strong>{{ composicionCaso }}</strong>
+          </article>
+        </section>
+
+        <section class="carabineros-workflow" aria-label="Flujo de trabajo Carabineros">
+          <article class="card section-card workflow-item">
+            <div class="card-title-row">
+              <h3>Detalle del procedimiento</h3>
+            </div>
+
+            <div class="case-facts">
+              <div>
+                <span>Código</span>
+                <strong>{{ caso.codigo }}</strong>
+              </div>
+              <div>
+                <span>Tipo de control</span>
+                <strong>{{ etiquetaTipoControl(caso.tipoControl) }}</strong>
+              </div>
+              <div>
+                <span>Fecha procedimiento</span>
+                <strong>{{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}</strong>
+              </div>
+              <div>
+                <span>Lugar</span>
+                <strong>{{ caso.lugar }}</strong>
+              </div>
+              <div>
+                <span>Coordenadas</span>
+                <strong>{{ caso.coordenadas || 'No informadas' }}</strong>
+              </div>
+              <div>
+                <span>Fecha de ingreso</span>
+                <strong>{{ fechaIngresoTexto }}</strong>
+              </div>
+              <div>
+                <span>Estado de salud</span>
+                <strong>{{ caso.estadoSalud || 'No informado' }}</strong>
+              </div>
+              <div>
+                <span>Creado por</span>
+                <strong>{{ caso.creadoPor.nombreCompleto || 'No disponible' }}</strong>
+              </div>
+            </div>
+
+            <div class="obs-base">
+              <h4>Observaciones iniciales</h4>
+              <p>{{ observacionesBase || 'Sin observaciones' }}</p>
+            </div>
+          </article>
+
+          <article class="card section-card workflow-item">
+            <div class="card-title-row">
+              <h3>Personas involucradas</h3>
+              <span class="meta-count">{{ caso.personas.length }} registro(s)</span>
+            </div>
+
+            <div class="people-list">
+              <article
+                class="person-row"
+                *ngFor="let persona of caso.personas"
+                [class.person-row--minor]="persona.tipoPersona === 'MENOR'"
+              >
+                <div class="person-role">
+                  <span>{{ etiquetaTipoPersona(persona.tipoPersona) }}</span>
+                </div>
+                <div class="person-main">
+                  <strong>{{ persona.nombres }} {{ persona.apellidos }}</strong>
+                  <span>{{ persona.nacionalidad }} · {{ persona.edad }} años</span>
+                </div>
+                <div class="person-doc">
+                  <span>Documento</span>
+                  <strong>{{ persona.numeroDocumento }}</strong>
+                </div>
+              </article>
+            </div>
+          </article>
+
+          <article class="card section-card workflow-item">
+            <div class="card-title-row">
+              <h3>Evidencias Ejército</h3>
+              <span class="meta-count">{{ evidenciasEjercito.length }} archivo(s)</span>
+            </div>
+
+            <div class="evidence-summary">
+              <div>
+                <span>Documentos identidad</span>
+                <strong>{{ contarEvidenciasEjercito('DOCUMENTO_IDENTIDAD') }}</strong>
+              </div>
+              <div>
+                <span>Fotografías</span>
+                <strong>{{ contarEvidenciasEjercito('FOTO_PERSONA') }}</strong>
+              </div>
+              <div>
+                <span>Adjuntos</span>
+                <strong>{{ contarEvidenciasEjercito('ADJUNTO_GENERAL') }}</strong>
+              </div>
+            </div>
+
+            <div class="table-wrap table-wrap--compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Nombre</th>
+                    <th>Persona</th>
+                    <th>Fecha</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let evidencia of evidenciasEjercito">
+                    <td>{{ etiquetaTipoEvidencia(evidencia.tipoEvidencia) }}</td>
+                    <td>{{ evidencia.nombreOriginal }}</td>
+                    <td>{{ etiquetaPersonaEvidencia(evidencia) }}</td>
+                    <td>{{ evidencia.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                    <td class="evidence-actions">
+                      <button
+                        class="btn-icon"
+                        type="button"
+                        title="Ver evidencia"
+                        [attr.aria-label]="'Ver evidencia ' + evidencia.nombreOriginal"
+                        (click)="previsualizarEvidencia(evidencia)"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 5c5.2 0 8.6 4.3 9.7 6.1a1.7 1.7 0 0 1 0 1.8C20.6 14.7 17.2 19 12 19s-8.6-4.3-9.7-6.1a1.7 1.7 0 0 1 0-1.8C3.4 9.3 6.8 5 12 5Zm0 2C7.8 7 5 10.3 4 12c1 1.7 3.8 5 8 5s7-3.3 8-5c-1-1.7-3.8-5-8-5Zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z" />
+                        </svg>
+                      </button>
+                      <button class="btn-secondary" (click)="descargarEvidencia(evidencia)">Descargar</button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="!evidenciasEjercito.length">
+                    <td colspan="5">No hay evidencias de Ejército cargadas.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card work-panel workflow-item">
+            <div class="section-header evidence-stage-header">
+              <h3>Documentación Carabineros</h3>
+              <button
+                *ngIf="puedeCargarEvidenciaCarabineros"
+                type="button"
+                class="btn-evidence-add btn-sm"
+                [disabled]="
+                  loadingEvidenciaCarabineros ||
+                  convirtiendoEvidenciaCarabineros
+                "
+                (click)="abrirSelectorEvidenciaCarabineros()"
+              >
+                Agregar evidencia
+              </button>
+            </div>
+
+            <div class="upload-panel">
+              <ng-container *ngIf="puedeCargarEvidenciaCarabineros">
+                <p class="hint-text">
+                  Formatos permitidos: JPG, JPEG, PNG, PDF, DOC y DOCX. Tamaño máximo 10 MB.
+                </p>
+
+                <input
+                  #evidenciaCarabinerosInput
+                  class="sr-only-file"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                  [disabled]="loadingEvidenciaCarabineros || convirtiendoEvidenciaCarabineros"
+                  (change)="onEvidenciaCarabinerosSeleccionada($event)"
+                />
+
+                <p class="hint-text" *ngIf="!evidenciaCarabinerosArchivo && documentacionCarabineros.length === 0">
+                  No has agregado evidencias de Carabineros aún.
+                </p>
+              </ng-container>
+
+              <div class="evidencias-grid" *ngIf="evidenciaCarabinerosArchivo">
+                <article class="evidencia-card">
+                  <div class="form-grid evidencia-form-grid">
+                    <div>
+                      <label>Tipo de evidencia</label>
+                      <input value="Adjunto general" readonly />
+                    </div>
+                    <div>
+                      <label>Archivo</label>
+                      <div class="file-field-inline">
+                        <input [value]="evidenciaCarabinerosNombre" readonly />
+                        <button
+                          type="button"
+                          class="btn-secondary btn-sm"
+                          [disabled]="loadingEvidenciaCarabineros || convirtiendoEvidenciaCarabineros"
+                          (click)="abrirSelectorEvidenciaCarabineros()"
+                        >
+                          Cambiar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="hint-text">Archivo: {{ evidenciaCarabinerosNombre }}</p>
+
+                  <div class="evidencia-preview" *ngIf="evidenciaCarabinerosPreviewUrl">
+                    <img
+                      *ngIf="evidenciaCarabinerosPreviewEsImagen"
+                      [src]="evidenciaCarabinerosPreviewUrl"
+                      alt="Vista previa documentación Carabineros"
+                    />
+
+                    <div class="pdf-preview" *ngIf="evidenciaCarabinerosPreviewEsPdf">
+                      <span>PDF seleccionado</span>
+                      <button
+                        type="button"
+                        class="btn-secondary btn-sm"
+                        (click)="previsualizarEvidenciaCarabinerosSeleccionada()"
+                      >
+                        Ver archivo
+                      </button>
+                    </div>
+
+                    <div class="word-preview" *ngIf="convirtiendoEvidenciaCarabineros">
+                      <span>Preparando vista previa</span>
+                      <strong>Convirtiendo documento a PDF...</strong>
+                      <small>El archivo quedará listo antes de subir la evidencia.</small>
+                    </div>
+
+                    <div
+                      class="pdf-preview"
+                      *ngIf="
+                        !evidenciaCarabinerosPreviewEsImagen &&
+                        !evidenciaCarabinerosPreviewEsPdf &&
+                        !convirtiendoEvidenciaCarabineros
+                      "
+                    >
+                      <span>Archivo seleccionado</span>
+                      <small>Este formato quedará disponible para descarga.</small>
+                    </div>
+                  </div>
+
+                  <div class="evidencia-actions evidencia-actions--split">
+                    <button
+                      type="button"
+                      class="btn-danger"
+                      [disabled]="loadingEvidenciaCarabineros || convirtiendoEvidenciaCarabineros"
+                      (click)="limpiarEvidenciaCarabineros()"
+                    >
+                      Quitar evidencia
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-primary"
+                      [disabled]="
+                        loadingEvidenciaCarabineros ||
+                        convirtiendoEvidenciaCarabineros ||
+                        !puedeCargarEvidenciaCarabineros ||
+                        !evidenciaCarabinerosArchivo
+                      "
+                      (click)="subirEvidenciaCarabineros()"
+                    >
+                      {{
+                        loadingEvidenciaCarabineros
+                          ? 'Subiendo...'
+                          : 'Subir evidencia'
+                      }}
+                    </button>
+                  </div>
+                </article>
+              </div>
+
+              <p class="upload-error" *ngIf="evidenciaCarabinerosError">
+                {{ evidenciaCarabinerosError }}
+              </p>
+
+              <div class="evidencias-existentes" *ngIf="documentacionCarabineros.length > 0">
+                <div class="uploaded-docs-head">
+                  <h4>Documentación cargada</h4>
+                  <span class="meta-count">{{ documentacionCarabineros.length }} archivo(s)</span>
+                </div>
+
+                <div class="table-wrap table-wrap--compact">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Tipo</th>
+                        <th>Archivo</th>
+                        <th>Fecha</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let evidencia of documentacionCarabineros">
+                        <td>{{ etiquetaTipoEvidencia(evidencia.tipoEvidencia) }}</td>
+                        <td>{{ evidencia.nombreOriginal }}</td>
+                        <td>{{ evidencia.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                        <td class="evidence-actions">
+                          <button
+                            class="btn-icon"
+                            type="button"
+                            title="Ver documentación"
+                            [attr.aria-label]="'Ver documentación ' + evidencia.nombreOriginal"
+                            (click)="previsualizarEvidencia(evidencia)"
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M12 5c5.2 0 8.6 4.3 9.7 6.1a1.7 1.7 0 0 1 0 1.8C20.6 14.7 17.2 19 12 19s-8.6-4.3-9.7-6.1a1.7 1.7 0 0 1 0-1.8C3.4 9.3 6.8 5 12 5Zm0 2C7.8 7 5 10.3 4 12c1 1.7 3.8 5 8 5s7-3.3 8-5c-1-1.7-3.8-5-8-5Zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z" />
+                            </svg>
+                          </button>
+                          <button class="btn-secondary" type="button" (click)="descargarEvidencia(evidencia)">Descargar</button>
+                          <button
+                            class="btn-danger"
+                            type="button"
+                            *ngIf="puedeEliminarDocumentacionCarabineros(evidencia)"
+                            [disabled]="loadingEliminarEvidenciaId === evidencia.id"
+                            (click)="eliminarDocumentacionCarabineros(evidencia)"
+                          >
+                            {{ loadingEliminarEvidenciaId === evidencia.id ? 'Eliminando...' : 'Eliminar' }}
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="evidencia-empty-box" *ngIf="documentacionCarabineros.length === 0">
+                Aún no hay documentación institucional cargada.
+              </div>
+            </div>
+          </article>
+
+          <article class="card section-card workflow-item" *ngIf="puedeGestionInstitucional">
+            <h3>Constancia de Carabineros</h3>
+            <p class="helper-text">
+              Registra la constancia o actuación realizada antes de derivar el caso a PDI.
+            </p>
+            <div class="observacion-box">
+              <textarea
+                [(ngModel)]="observacionInstitucional"
+                placeholder="Ej: Se revisan antecedentes, se entrevista al adulto responsable y se deja constancia de la medida adoptada."
+                rows="5"
+              ></textarea>
+              <button
+                class="btn-primary"
+                [disabled]="loadingObservacion"
+                (click)="guardarObservacionInstitucional()"
+              >
+                {{ loadingObservacion ? 'Guardando...' : 'Guardar constancia' }}
+              </button>
+            </div>
+          </article>
+
+          <article class="card section-card workflow-item">
+            <div class="card-title-row">
+              <h3>Historial de constancias</h3>
+              <span class="meta-count">{{ observacionesInstitucionalesDetalladas.length }} registro(s)</span>
+            </div>
+
+            <div class="obs-list obs-list--timeline" *ngIf="observacionesInstitucionalesDetalladas.length > 0; else sinBitacora">
+              <ul>
+                <li *ngFor="let item of observacionesInstitucionalesDetalladas">
+                  <div class="obs-item-head">
+                    <span class="obs-origin">{{ item.origen }}</span>
+                    <span class="obs-date">{{ item.fecha }}</span>
+                  </div>
+                  <p>{{ item.texto }}</p>
+                </li>
+              </ul>
+            </div>
+
+            <ng-template #sinBitacora>
+              <p class="empty-note">Aún no hay observaciones institucionales registradas.</p>
+            </ng-template>
+          </article>
+
+          <article class="final-action-card workflow-item workflow-item--final" *ngIf="puedeDerivarAPdi">
+            <div>
+              <span>Derivación pendiente</span>
+              <strong>Enviar antecedentes a PDI</strong>
+            </div>
+            <button
+              class="btn-primary btn-final"
+              [disabled]="loadingAccionFlujo"
+              (click)="abrirConfirmacionDerivacionAPdi()"
+            >
+              {{ loadingAccionFlujo ? 'Procesando...' : 'Derivar a PDI' }}
+            </button>
+          </article>
+        </section>
+	      </ng-container>
+
+	      <ng-template #detalleNoCarabineros>
+	        <ng-container *ngIf="esPerfilPdi; else detalleGeneral">
+	          <section class="work-status-grid">
+	            <article class="work-status-card">
+	              <span>Responsable actual</span>
+	              <strong>{{ responsableActual }}</strong>
+	            </article>
+	            <article class="work-status-card">
+	              <span>Siguiente etapa</span>
+	              <strong>{{ siguienteEtapa }}</strong>
+	            </article>
+	            <article class="work-status-card">
+	              <span>Composición</span>
+	              <strong>{{ composicionCaso }}</strong>
+	            </article>
+	          </section>
+
+	          <section class="carabineros-workflow" aria-label="Flujo de trabajo PDI">
+	            <article class="card section-card workflow-item">
+	              <div class="card-title-row">
+	                <h3>Detalle del procedimiento</h3>
+	              </div>
+
+	              <div class="case-facts">
+	                <div>
+	                  <span>Código</span>
+	                  <strong>{{ caso.codigo }}</strong>
+	                </div>
+	                <div>
+	                  <span>Tipo de control</span>
+	                  <strong>{{ etiquetaTipoControl(caso.tipoControl) }}</strong>
+	                </div>
+	                <div>
+	                  <span>Fecha procedimiento</span>
+	                  <strong>{{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}</strong>
+	                </div>
+	                <div>
+	                  <span>Lugar</span>
+	                  <strong>{{ caso.lugar }}</strong>
+	                </div>
+	                <div>
+	                  <span>Coordenadas</span>
+	                  <strong>{{ caso.coordenadas || 'No informadas' }}</strong>
+	                </div>
+	                <div>
+	                  <span>Fecha de ingreso</span>
+	                  <strong>{{ fechaIngresoTexto }}</strong>
+	                </div>
+	                <div>
+	                  <span>Estado de salud</span>
+	                  <strong>{{ caso.estadoSalud || 'No informado' }}</strong>
+	                </div>
+	                <div>
+	                  <span>Creado por</span>
+	                  <strong>{{ caso.creadoPor.nombreCompleto || 'No disponible' }}</strong>
+	                </div>
+	              </div>
+
+	              <div class="obs-base">
+	                <h4>Observaciones iniciales</h4>
+	                <p>{{ observacionesBase || 'Sin observaciones' }}</p>
+	              </div>
+	            </article>
+
+	            <article class="card section-card workflow-item">
+	              <div class="card-title-row">
+	                <h3>Personas involucradas</h3>
+	                <span class="meta-count">{{ caso.personas.length }} registro(s)</span>
+	              </div>
+
+	              <div class="people-list">
+	                <article
+	                  class="person-row"
+	                  *ngFor="let persona of caso.personas"
+	                  [class.person-row--minor]="persona.tipoPersona === 'MENOR'"
+	                >
+	                  <div class="person-role">
+	                    <span>{{ etiquetaTipoPersona(persona.tipoPersona) }}</span>
+	                  </div>
+	                  <div class="person-main">
+	                    <strong>{{ persona.nombres }} {{ persona.apellidos }}</strong>
+	                    <span>{{ persona.nacionalidad }} · {{ persona.edad }} años</span>
+	                  </div>
+	                  <div class="person-doc">
+	                    <span>Documento</span>
+	                    <strong>{{ persona.numeroDocumento }}</strong>
+	                  </div>
+	                </article>
+	              </div>
+	            </article>
+
+	            <article class="card section-card workflow-item">
+	              <div class="card-title-row">
+	                <h3>Antecedentes disponibles</h3>
+	                <span class="meta-count">{{ evidenciasDisponiblesPdi.length }} archivo(s)</span>
+	              </div>
+
+	              <div class="evidence-summary">
+	                <div>
+	                  <span>Ejército</span>
+	                  <strong>{{ evidenciasEjercito.length }}</strong>
+	                </div>
+	                <div>
+	                  <span>Carabineros</span>
+	                  <strong>{{ documentacionCarabineros.length }}</strong>
+	                </div>
+	                <div>
+	                  <span>Total</span>
+	                  <strong>{{ evidenciasDisponiblesPdi.length }}</strong>
+	                </div>
+	              </div>
+
+	              <div class="table-wrap table-wrap--compact">
+	                <table>
+	                  <thead>
+	                    <tr>
+	                      <th>Origen</th>
+	                      <th>Tipo</th>
+	                      <th>Nombre</th>
+	                      <th>Persona</th>
+	                      <th>Fecha</th>
+	                      <th></th>
+	                    </tr>
+	                  </thead>
+	                  <tbody>
+	                    <tr *ngFor="let evidencia of evidenciasDisponiblesPdi">
+	                      <td>{{ etiquetaOrigenEvidencia(evidencia) }}</td>
+	                      <td>{{ etiquetaTipoEvidencia(evidencia.tipoEvidencia) }}</td>
+	                      <td>{{ evidencia.nombreOriginal }}</td>
+	                      <td>{{ etiquetaPersonaEvidencia(evidencia) }}</td>
+	                      <td>{{ evidencia.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+	                      <td class="evidence-actions">
+	                        <button
+	                          class="btn-icon"
+	                          type="button"
+	                          title="Ver evidencia"
+	                          [attr.aria-label]="'Ver evidencia ' + evidencia.nombreOriginal"
+	                          (click)="previsualizarEvidencia(evidencia)"
+	                        >
+	                          <svg viewBox="0 0 24 24" aria-hidden="true">
+	                            <path d="M12 5c5.2 0 8.6 4.3 9.7 6.1a1.7 1.7 0 0 1 0 1.8C20.6 14.7 17.2 19 12 19s-8.6-4.3-9.7-6.1a1.7 1.7 0 0 1 0-1.8C3.4 9.3 6.8 5 12 5Zm0 2C7.8 7 5 10.3 4 12c1 1.7 3.8 5 8 5s7-3.3 8-5c-1-1.7-3.8-5-8-5Zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z" />
+	                          </svg>
+	                        </button>
+	                        <button class="btn-secondary" (click)="descargarEvidencia(evidencia)">Descargar</button>
+	                      </td>
+	                    </tr>
+	                    <tr *ngIf="!evidenciasDisponiblesPdi.length">
+	                      <td colspan="6">No hay antecedentes cargados para este caso.</td>
+	                    </tr>
+	                  </tbody>
+		                </table>
+		              </div>
+		            </article>
+
+		            <article class="card work-panel workflow-item">
+		              <div class="section-header evidence-stage-header">
+		                <h3>Documentación PDI</h3>
+		                <button
+		                  *ngIf="puedeCargarEvidenciaPdi"
+		                  type="button"
+		                  class="btn-evidence-add btn-sm"
+		                  [disabled]="
+		                    loadingEvidenciaCarabineros ||
+		                    convirtiendoEvidenciaCarabineros
+		                  "
+		                  (click)="abrirSelectorEvidenciaCarabineros()"
+		                >
+		                  Agregar evidencia
+		                </button>
+		              </div>
+
+		              <div class="upload-panel">
+		                <ng-container *ngIf="puedeCargarEvidenciaPdi">
+		                  <p class="hint-text">
+		                    Formatos permitidos: JPG, JPEG, PNG, PDF, DOC y DOCX. Tamaño máximo 10 MB.
+		                  </p>
+
+		                  <input
+		                    #evidenciaCarabinerosInput
+		                    class="sr-only-file"
+		                    type="file"
+		                    accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+		                    [disabled]="loadingEvidenciaCarabineros || convirtiendoEvidenciaCarabineros"
+		                    (change)="onEvidenciaCarabinerosSeleccionada($event)"
+		                  />
+
+		                  <p class="hint-text" *ngIf="!evidenciaCarabinerosArchivo && documentacionPdi.length === 0">
+		                    No has agregado evidencias PDI aún.
+		                  </p>
+		                </ng-container>
+
+		                <div class="evidencias-grid" *ngIf="evidenciaCarabinerosArchivo">
+		                  <article class="evidencia-card">
+		                    <div class="form-grid evidencia-form-grid">
+		                      <div>
+		                        <label>Tipo de evidencia</label>
+		                        <input value="Adjunto general" readonly />
+		                      </div>
+		                      <div>
+		                        <label>Archivo</label>
+		                        <div class="file-field-inline">
+		                          <input [value]="evidenciaCarabinerosNombre" readonly />
+		                          <button
+		                            type="button"
+		                            class="btn-secondary btn-sm"
+		                            [disabled]="loadingEvidenciaCarabineros || convirtiendoEvidenciaCarabineros"
+		                            (click)="abrirSelectorEvidenciaCarabineros()"
+		                          >
+		                            Cambiar
+		                          </button>
+		                        </div>
+		                      </div>
+		                    </div>
+
+		                    <p class="hint-text">Archivo: {{ evidenciaCarabinerosNombre }}</p>
+
+		                    <div class="evidencia-preview" *ngIf="evidenciaCarabinerosPreviewUrl">
+		                      <img
+		                        *ngIf="evidenciaCarabinerosPreviewEsImagen"
+		                        [src]="evidenciaCarabinerosPreviewUrl"
+		                        alt="Vista previa documentación PDI"
+		                      />
+
+		                      <div class="pdf-preview" *ngIf="evidenciaCarabinerosPreviewEsPdf">
+		                        <span>PDF seleccionado</span>
+		                        <button
+		                          type="button"
+		                          class="btn-secondary btn-sm"
+		                          (click)="previsualizarEvidenciaCarabinerosSeleccionada()"
+		                        >
+		                          Ver archivo
+		                        </button>
+		                      </div>
+
+		                      <div class="word-preview" *ngIf="convirtiendoEvidenciaCarabineros">
+		                        <span>Preparando vista previa</span>
+		                        <strong>Convirtiendo documento a PDF...</strong>
+		                        <small>El archivo quedará listo antes de subir la evidencia.</small>
+		                      </div>
+
+		                      <div
+		                        class="pdf-preview"
+		                        *ngIf="
+		                          !evidenciaCarabinerosPreviewEsImagen &&
+		                          !evidenciaCarabinerosPreviewEsPdf &&
+		                          !convirtiendoEvidenciaCarabineros
+		                        "
+		                      >
+		                        <span>Archivo seleccionado</span>
+		                        <small>Este formato quedará disponible para descarga.</small>
+		                      </div>
+		                    </div>
+
+		                    <div class="evidencia-actions evidencia-actions--split">
+		                      <button
+		                        type="button"
+		                        class="btn-danger"
+		                        [disabled]="loadingEvidenciaCarabineros || convirtiendoEvidenciaCarabineros"
+		                        (click)="limpiarEvidenciaCarabineros()"
+		                      >
+		                        Quitar evidencia
+		                      </button>
+		                      <button
+		                        type="button"
+		                        class="btn-primary"
+		                        [disabled]="
+		                          loadingEvidenciaCarabineros ||
+		                          convirtiendoEvidenciaCarabineros ||
+		                          !puedeCargarEvidenciaPdi ||
+		                          !evidenciaCarabinerosArchivo
+		                        "
+		                        (click)="subirEvidenciaCarabineros()"
+		                      >
+		                        {{
+		                          loadingEvidenciaCarabineros
+		                            ? 'Subiendo...'
+		                            : 'Subir evidencia'
+		                        }}
+		                      </button>
+		                    </div>
+		                  </article>
+		                </div>
+
+		                <p class="upload-error" *ngIf="evidenciaCarabinerosError">
+		                  {{ evidenciaCarabinerosError }}
+		                </p>
+
+		                <div class="evidencias-existentes" *ngIf="documentacionPdi.length > 0">
+		                  <div class="uploaded-docs-head">
+		                    <h4>Documentación cargada</h4>
+		                    <span class="meta-count">{{ documentacionPdi.length }} archivo(s)</span>
+		                  </div>
+
+		                  <div class="table-wrap table-wrap--compact">
+		                    <table>
+		                      <thead>
+		                        <tr>
+		                          <th>Tipo</th>
+		                          <th>Archivo</th>
+		                          <th>Fecha</th>
+		                          <th></th>
+		                        </tr>
+		                      </thead>
+		                      <tbody>
+		                        <tr *ngFor="let evidencia of documentacionPdi">
+		                          <td>{{ etiquetaTipoEvidencia(evidencia.tipoEvidencia) }}</td>
+		                          <td>{{ evidencia.nombreOriginal }}</td>
+		                          <td>{{ evidencia.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+		                          <td class="evidence-actions">
+		                            <button
+		                              class="btn-icon"
+		                              type="button"
+		                              title="Ver documentación"
+		                              [attr.aria-label]="'Ver documentación ' + evidencia.nombreOriginal"
+		                              (click)="previsualizarEvidencia(evidencia)"
+		                            >
+		                              <svg viewBox="0 0 24 24" aria-hidden="true">
+		                                <path d="M12 5c5.2 0 8.6 4.3 9.7 6.1a1.7 1.7 0 0 1 0 1.8C20.6 14.7 17.2 19 12 19s-8.6-4.3-9.7-6.1a1.7 1.7 0 0 1 0-1.8C3.4 9.3 6.8 5 12 5Zm0 2C7.8 7 5 10.3 4 12c1 1.7 3.8 5 8 5s7-3.3 8-5c-1-1.7-3.8-5-8-5Zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z" />
+		                              </svg>
+		                            </button>
+		                            <button class="btn-secondary" type="button" (click)="descargarEvidencia(evidencia)">Descargar</button>
+		                            <button
+		                              class="btn-danger"
+		                              type="button"
+		                              *ngIf="puedeEliminarDocumentacionPdi(evidencia)"
+		                              [disabled]="loadingEliminarEvidenciaId === evidencia.id"
+		                              (click)="eliminarDocumentacionPdi(evidencia)"
+		                            >
+		                              {{ loadingEliminarEvidenciaId === evidencia.id ? 'Eliminando...' : 'Eliminar' }}
+		                            </button>
+		                          </td>
+		                        </tr>
+		                      </tbody>
+		                    </table>
+		                  </div>
+		                </div>
+
+		                <div class="evidencia-empty-box" *ngIf="documentacionPdi.length === 0">
+		                  Aún no hay documentación PDI cargada.
+		                </div>
+		              </div>
+		            </article>
+
+		            <article class="card section-card workflow-item" *ngIf="puedeGestionInstitucional">
+		              <h3>Constancia PDI</h3>
+	              <p class="helper-text">
+	                Registra la actuación o revisión realizada antes del cierre del caso.
+	              </p>
+	              <div class="observacion-box">
+	                <textarea
+	                  [(ngModel)]="observacionInstitucional"
+	                  placeholder="Ej: Se revisan antecedentes, se valida continuidad del procedimiento y se deja constancia de la resolución adoptada."
+	                  rows="5"
+	                ></textarea>
+	                <button
+	                  class="btn-primary"
+	                  [disabled]="loadingObservacion"
+	                  (click)="guardarObservacionInstitucional()"
+	                >
+	                  {{ loadingObservacion ? 'Guardando...' : 'Guardar constancia' }}
+	                </button>
+	              </div>
+	            </article>
+
+	            <article class="card section-card workflow-item">
+	              <div class="card-title-row">
+	                <h3>Historial de constancias</h3>
+	                <span class="meta-count">{{ observacionesInstitucionalesDetalladas.length }} registro(s)</span>
+	              </div>
+
+	              <div class="obs-list obs-list--timeline" *ngIf="observacionesInstitucionalesDetalladas.length > 0; else sinBitacoraPdi">
+	                <ul>
+	                  <li *ngFor="let item of observacionesInstitucionalesDetalladas">
+	                    <div class="obs-item-head">
+	                      <span class="obs-origin">{{ item.origen }}</span>
+	                      <span class="obs-date">{{ item.fecha }}</span>
+	                    </div>
+	                    <p>{{ item.texto }}</p>
+	                  </li>
+	                </ul>
+	              </div>
+
+	              <ng-template #sinBitacoraPdi>
+	                <p class="empty-note">Aún no hay observaciones institucionales registradas.</p>
+	              </ng-template>
+	            </article>
+
+		            <article class="card section-card workflow-item resolution-card">
+		              <div class="card-title-row">
+		                <h3>Resolución PDI</h3>
+		                <span class="status-chip" [ngClass]="estadoClase(caso.estado)">
+		                  {{ etiquetaEstadoCorta }}
+		                </span>
+		              </div>
+
+		              <ng-container *ngIf="!resolucionPdiRegistrada; else resolucionPdiCerrada">
+		                <p class="helper-text">
+		                  Responde estas preguntas en orden. El sistema calculará el resultado final antes de cerrar el caso.
+		                </p>
+
+		                <div class="resolution-simple-flow">
+		                  <section class="resolution-question">
+		                    <span class="resolution-step">1</span>
+		                    <div class="resolution-question-body">
+		                    <label>¿Existe una orden judicial vigente?</label>
+		                    <p class="resolution-hint">
+		                      Si existe una orden judicial, el caso quedará orientado a tribunal.
+		                    </p>
+		                    <select [(ngModel)]="pdiOrdenJudicialVigente" (ngModelChange)="onOrdenJudicialPdiChange()">
+		                      <option value="">Selecciona una opción</option>
+		                      <option value="SI">Sí, existe orden judicial vigente</option>
+		                      <option value="NO">No existe orden judicial vigente</option>
+		                    </select>
+		                    </div>
+		                  </section>
+
+		                  <section class="resolution-question" *ngIf="pdiOrdenJudicialVigente === 'NO'">
+		                    <span class="resolution-step">2</span>
+		                    <div class="resolution-question-body">
+		                    <label>¿Qué situación migratoria se verificó?</label>
+		                    <p class="resolution-hint">
+		                      Selecciona el tipo de movimiento asociado al paso no habilitado.
+		                    </p>
+		                    <select [(ngModel)]="pdiSituacionMigratoria" (ngModelChange)="pdiReconducible = ''">
+		                      <option value="">Selecciona una situación</option>
+		                      <option value="INGRESO_PNH">Ingreso por paso no habilitado</option>
+		                      <option value="EGRESO_PNH">Egreso por paso no habilitado</option>
+		                    </select>
+		                    </div>
+		                  </section>
+
+		                  <section
+		                    class="resolution-question"
+		                    *ngIf="pdiOrdenJudicialVigente === 'NO' && pdiSituacionMigratoria === 'INGRESO_PNH'"
+		                  >
+		                    <span class="resolution-step">3</span>
+		                    <div class="resolution-question-body">
+		                    <label>¿Procede la reconducción?</label>
+		                    <p class="resolution-hint">
+		                      Indica si corresponde reconducir según la revisión institucional.
+		                    </p>
+		                    <select [(ngModel)]="pdiReconducible">
+		                      <option value="">Selecciona una opción</option>
+		                      <option value="SI">Sí, procede reconducción</option>
+		                      <option value="NO">No procede reconducción</option>
+		                    </select>
+		                    </div>
+		                  </section>
+		                  </div>
+
+		                <div class="resolution-result" *ngIf="resultadoPdiCalculado">
+		                  <span>Resultado final que se registrará</span>
+		                  <strong>{{ etiquetaResultadoPdi(resultadoPdiCalculado) }}</strong>
+		                  <small>Este resultado se define automáticamente con las respuestas anteriores.</small>
+		                </div>
+
+		                <div class="final-action-card final-action-card--pdi">
+		                  <div>
+		                    <span>Cierre institucional</span>
+		                    <strong>Cerrar caso migratorio</strong>
+		                  </div>
+		                  <button
+		                    class="btn-primary btn-final"
+		                    [disabled]="loadingAccionFlujo || !puedeCerrarPdiConResolucion"
+		                    (click)="cerrarCasoPdiConResolucion()"
+		                  >
+		                    {{ loadingAccionFlujo ? 'Procesando...' : 'Cerrar caso' }}
+		                  </button>
+		                </div>
+		              </ng-container>
+
+		              <ng-template #resolucionPdiCerrada>
+		                <div class="resolution-readonly">
+		                  <div>
+		                    <span>Orden judicial</span>
+		                    <strong>{{ etiquetaOrdenJudicialPdi(caso.pdiOrdenJudicialVigente) }}</strong>
+		                  </div>
+		                  <div *ngIf="caso.pdiOrdenJudicialVigente === false">
+		                    <span>Situación migratoria</span>
+		                    <strong>{{ etiquetaSituacionMigratoriaPdi(caso.pdiSituacionMigratoria) }}</strong>
+		                  </div>
+		                  <div *ngIf="caso.pdiOrdenJudicialVigente === false && caso.pdiSituacionMigratoria === 'INGRESO_PNH'">
+		                    <span>Reconducción</span>
+		                    <strong>{{ etiquetaReconduciblePdi(caso.pdiReconducible) }}</strong>
+		                  </div>
+		                  <div>
+		                    <span>Resultado final</span>
+		                    <strong>{{ etiquetaResultadoPdi(caso.pdiResultado) }}</strong>
+		                  </div>
+		                </div>
+		              </ng-template>
+		            </article>
+		          </section>
+		        </ng-container>
+	      </ng-template>
+
+	      <ng-template #detalleGeneral>
+      <article class="card">
+        <div class="card-title-row">
+          <h3>Resumen del procedimiento</h3>
+        </div>
+
+        <div class="resumen-grid">
+          <div class="resumen-item">
+            <span class="resumen-label">Creado por</span>
+            <strong>{{ caso.creadoPor.nombreCompleto || 'No disponible' }}</strong>
+          </div>
+          <div class="resumen-item resumen-item--estado" [ngClass]="estadoClase(caso.estado)">
+            <span class="resumen-label">{{ etiquetaTituloEstadoResumen }}</span>
+            <strong>{{ etiquetaDetalleEstadoResumen }}</strong>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">JAF</span>
+            <strong>{{ etiquetaJaf(caso.jaf) }}</strong>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Tipo de control</span>
+            <strong>{{ etiquetaTipoControl(caso.tipoControl) }}</strong>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Fecha del procedimiento</span>
+            <strong>{{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}</strong>
+          </div>
+          <div class="resumen-item">
+            <span class="resumen-label">Lugar</span>
+            <strong>{{ caso.lugar }}</strong>
+          </div>
+        </div>
+
+        <div class="obs-base">
+          <h4>Observaciones iniciales</h4>
+          <p>{{ observacionesBase || 'Sin observaciones' }}</p>
+        </div>
+
+        <div class="obs-list" *ngIf="observacionesInstitucionalesDetalladas.length > 0">
+          <h4>Bitácora institucional</h4>
+          <ul>
+            <li *ngFor="let item of observacionesInstitucionalesDetalladas">
+              <div class="obs-item-head">
+                <span class="obs-origin">{{ item.origen }}</span>
+                <span class="obs-date">{{ item.fecha }}</span>
+              </div>
+              <p>{{ item.texto }}</p>
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card card-gestion" *ngIf="puedeGestionInstitucional">
+        <div class="card-title-row">
+          <h3>Gestión institucional</h3>
+          <span class="status-chip" [ngClass]="estadoClase(caso.estado)">
+            {{ etiquetaEstadoCorta }}
+          </span>
+        </div>
+        <p class="helper-text">Acciones habilitadas según el flujo actual del caso.</p>
+
+        <div class="flow-actions">
+          <button
+            class="btn-secondary"
+            *ngIf="puedeRecepcionarCarabineros"
+            [disabled]="loadingAccionFlujo"
+            (click)="ejecutarAccionFlujo('RECEPCIONAR_CARABINEROS')"
+          >
+            {{ loadingAccionFlujo ? 'Procesando...' : 'Recepcionar (Carabineros)' }}
+          </button>
+
+          <button
+            class="btn-primary"
+            *ngIf="puedeDerivarAPdi"
+            [disabled]="loadingAccionFlujo"
+            (click)="ejecutarAccionFlujo('DERIVAR_A_PDI')"
+          >
+            {{ loadingAccionFlujo ? 'Procesando...' : 'Derivar a PDI' }}
+          </button>
+
+          <button
+            class="btn-secondary"
+            *ngIf="puedeRecepcionarPdi"
+            [disabled]="loadingAccionFlujo"
+            (click)="ejecutarAccionFlujo('RECEPCIONAR_PDI')"
+          >
+            {{ loadingAccionFlujo ? 'Procesando...' : 'Recepcionar en PDI' }}
+          </button>
+
+          <button
+            class="btn-primary"
+            *ngIf="puedeCerrarEnPdi"
+            [disabled]="loadingAccionFlujo"
+            (click)="ejecutarAccionFlujo('CERRAR_PDI')"
+          >
+            {{ loadingAccionFlujo ? 'Procesando...' : 'Cerrar caso' }}
+          </button>
+        </div>
+      </article>
+
+      <article class="card" *ngIf="puedeGestionInstitucional">
+        <h3>Agregar observación institucional</h3>
+        <p class="helper-text">
+          Este registro queda incorporado en la trazabilidad institucional del caso.
+        </p>
+        <div class="observacion-box">
+          <textarea
+            [(ngModel)]="observacionInstitucional"
+            placeholder="Escribe una observación institucional para seguimiento del caso."
+            rows="3"
+          ></textarea>
+          <button class="btn-primary" [disabled]="loadingObservacion" (click)="guardarObservacionInstitucional()">
+            {{ loadingObservacion ? 'Guardando...' : 'Guardar observación' }}
+          </button>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-title-row">
+          <h3>Personas</h3>
+          <span class="meta-count">{{ caso.personas.length }} registro(s)</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Nombre</th>
+                <th>Documento</th>
+                <th>Nacionalidad</th>
+                <th>Edad</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let persona of caso.personas">
+                <td>{{ persona.tipoPersona }}</td>
+                <td>{{ persona.nombres }} {{ persona.apellidos }}</td>
+                <td>{{ persona.numeroDocumento }}</td>
+                <td>{{ persona.nacionalidad }}</td>
+                <td>{{ persona.edad }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-title-row">
+          <h3>Evidencias cargadas</h3>
+          <span class="meta-count">{{ evidencias.length }} archivo(s)</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Nombre</th>
+                <th>Persona</th>
+                <th>Fecha</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let evidencia of evidencias">
+                <td>{{ etiquetaTipoEvidencia(evidencia.tipoEvidencia) }}</td>
+                <td>{{ evidencia.nombreOriginal }}</td>
+                <td>{{ etiquetaPersonaEvidencia(evidencia) }}</td>
+                <td>{{ evidencia.creadoAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td class="evidence-actions">
+                  <button
+                    class="btn-icon"
+                    type="button"
+                    title="Ver evidencia"
+                    [attr.aria-label]="'Ver evidencia ' + evidencia.nombreOriginal"
+                    (click)="previsualizarEvidencia(evidencia)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 5c5.2 0 8.6 4.3 9.7 6.1a1.7 1.7 0 0 1 0 1.8C20.6 14.7 17.2 19 12 19s-8.6-4.3-9.7-6.1a1.7 1.7 0 0 1 0-1.8C3.4 9.3 6.8 5 12 5Zm0 2C7.8 7 5 10.3 4 12c1 1.7 3.8 5 8 5s7-3.3 8-5c-1-1.7-3.8-5-8-5Zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6Z" />
+                    </svg>
+                  </button>
+                  <button class="btn-secondary" (click)="descargarEvidencia(evidencia)">Descargar</button>
+                </td>
+              </tr>
+              <tr *ngIf="!evidencias.length">
+                <td colspan="5">No hay evidencias cargadas.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="final-action-card final-action-card--pending" *ngIf="puedeEnviarDerivacionPendiente">
+        <div>
+          <span>Derivación pendiente</span>
+          <strong>Enviar antecedentes a {{ destinoDerivacion }}</strong>
+        </div>
+        <button
+          class="btn-primary btn-final"
+          [disabled]="loadingAccionFlujo"
+          (click)="abrirConfirmacionDerivacion()"
+        >
+          {{ loadingAccionFlujo ? 'Procesando...' : 'Enviar a ' + destinoDerivacion }}
+        </button>
+      </article>
+      </ng-template>
+    </div>
+
+    <div class="preview-backdrop" *ngIf="vistaPreviaAbierta" (click)="cerrarVistaPrevia()">
+      <section
+        class="preview-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Vista previa de evidencia"
+        (click)="$event.stopPropagation()"
+      >
+        <header class="preview-header">
+          <div>
+            <span>Vista previa</span>
+            <strong>{{ vistaPreviaNombre }}</strong>
+          </div>
+          <button class="btn-icon preview-close" type="button" aria-label="Cerrar vista previa" (click)="cerrarVistaPrevia()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6 6.4 5Z" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="preview-body">
+          <div class="preview-loading" *ngIf="vistaPreviaCargando">
+            Cargando evidencia...
+          </div>
+
+          <img
+            *ngIf="!vistaPreviaCargando && vistaPreviaEsImagen"
+            [src]="vistaPreviaUrl"
+            [alt]="vistaPreviaNombre"
+          />
+
+          <iframe
+            *ngIf="!vistaPreviaCargando && vistaPreviaEsPdf && vistaPreviaResourceUrl"
+            [src]="vistaPreviaResourceUrl"
+            title="Vista previa de evidencia PDF"
+          ></iframe>
+
+          <div class="preview-empty" *ngIf="!vistaPreviaCargando && !vistaPreviaEsImagen && !vistaPreviaEsPdf">
+            <strong>Vista previa no disponible para este formato.</strong>
+            <span>Puedes descargar el archivo para revisarlo.</span>
+            <button class="btn-secondary" type="button" (click)="descargarVistaPrevia()">Descargar archivo</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="confirm-backdrop" *ngIf="confirmacionDerivacionAbierta" (click)="cerrarConfirmacionDerivacion()">
+      <section
+        class="confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirmar envío institucional"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="confirm-icon">?</div>
+        <h3>Confirmar envío</h3>
+        <p>{{ mensajeConfirmacionDerivacion }}</p>
+        <div class="confirm-actions">
+          <button class="btn-secondary" type="button" (click)="cerrarConfirmacionDerivacion()">
+            No
+          </button>
+          <button
+            class="btn-primary"
+            type="button"
+            [disabled]="loadingAccionFlujo"
+            (click)="confirmarEnvioDerivacion()"
+          >
+            {{ loadingAccionFlujo ? 'Enviando...' : 'Sí, enviar' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div class="confirm-backdrop" *ngIf="confirmacionEliminarEvidenciaAbierta" (click)="cerrarConfirmacionEliminarEvidencia()">
+      <section
+        class="confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirmar eliminación de evidencia"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="confirm-icon confirm-icon--danger">!</div>
+        <h3>Eliminar evidencia</h3>
+        <p>
+          ¿Eliminar la evidencia
+          <strong>{{ evidenciaPendienteEliminar?.nombreOriginal }}</strong>?
+        </p>
+        <div class="confirm-actions">
+          <button class="btn-secondary" type="button" (click)="cerrarConfirmacionEliminarEvidencia()">
+            Cancelar
+          </button>
+          <button
+            class="btn-danger"
+            type="button"
+            [disabled]="loadingEliminarEvidenciaId === evidenciaPendienteEliminar?.id"
+            (click)="confirmarEliminarEvidencia()"
+          >
+            {{ loadingEliminarEvidenciaId === evidenciaPendienteEliminar?.id ? 'Eliminando...' : 'Eliminar' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <app-alert-modal
+      [open]="alertaAbierta"
+      [title]="alertaTitulo"
+      [message]="alertaMensaje"
+      [variant]="alertaTipo"
+      (accepted)="cerrarAlerta()"
+    />
+  

@@ -5,6 +5,7 @@ import { LayoutComponent } from './shared/components/layout/layout.component';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
+import { MonitoreoMasterComponent } from './features/dashboard/monitoreo-master.component';
 import { UsuariosComponent } from './features/usuarios/usuarios.component';
 import { CasosListComponent } from './features/casos/casos-list.component';
 import { CasoFormComponent } from './features/casos/caso-form.component';
@@ -12,6 +13,7 @@ import { CasoDetalleComponent } from './features/casos/caso-detalle.component';
 import { ReportesComponent } from './features/reportes/reportes.component';
 import { AuditoriaComponent } from './features/auditoria/auditoria.component';
 import { ConsultaComponent } from './features/consulta/consulta.component';
+import { FeedbackComponent } from './features/feedback/feedback.component';
 
 export const routes: Routes = [
   {
@@ -34,6 +36,16 @@ export const routes: Routes = [
         data: { roles: ['ADMINISTRADOR'], pageTitle: 'Panel de Control Migratorio' },
       },
       {
+        path: 'dashboard/monitoreo-master',
+        component: MonitoreoMasterComponent,
+        canActivate: [roleGuard],
+        data: {
+          roles: ['ADMINISTRADOR'],
+          requiresMaster: true,
+          pageTitle: 'Monitoreo general',
+        },
+      },
+      {
         path: 'usuarios',
         component: UsuariosComponent,
         canActivate: [roleGuard],
@@ -44,8 +56,48 @@ export const routes: Routes = [
         component: CasosListComponent,
         canActivate: [roleGuard],
         data: {
-          roles: ['ADMINISTRADOR', 'OPERADOR', 'CONSULTA', 'AUDITOR'],
+          roles: ['ADMINISTRADOR', 'OPERADOR', 'CONSULTA', 'AUDITOR', 'CARABINEROS', 'PDI'],
           pageTitle: 'Casos',
+        },
+      },
+      {
+        path: 'casos/por-revisar-carabineros',
+        component: CasosListComponent,
+        canActivate: [roleGuard],
+        data: {
+          roles: ['ADMINISTRADOR', 'CARABINEROS'],
+          pageTitle: 'Casos por revisar (Carabineros)',
+          presetFilters: {
+            institucionDerivacion: 'CARABINEROS',
+            estado: 'DERIVADO_CARABINEROS',
+          },
+        },
+      },
+      {
+        path: 'casos/derivados-pdi',
+        component: CasosListComponent,
+        canActivate: [roleGuard],
+        data: {
+          roles: ['ADMINISTRADOR', 'CARABINEROS'],
+          pageTitle: 'Casos derivados a PDI',
+          presetFilters: {
+            institucionDerivacion: 'PDI',
+            estado: 'DERIVADO_PDI',
+            existenMenores: 'true',
+          },
+        },
+      },
+      {
+        path: 'casos/por-revisar-pdi',
+        component: CasosListComponent,
+        canActivate: [roleGuard],
+        data: {
+          roles: ['ADMINISTRADOR', 'PDI'],
+          pageTitle: 'Casos por revisar (PDI)',
+          presetFilters: {
+            institucionDerivacion: 'PDI',
+            estado: 'DERIVADO_PDI',
+          },
         },
       },
       {
@@ -65,7 +117,7 @@ export const routes: Routes = [
         component: CasoDetalleComponent,
         canActivate: [roleGuard],
         data: {
-          roles: ['ADMINISTRADOR', 'OPERADOR', 'CONSULTA', 'AUDITOR'],
+          roles: ['ADMINISTRADOR', 'OPERADOR', 'CONSULTA', 'AUDITOR', 'CARABINEROS', 'PDI'],
           pageTitle: 'Detalle de caso',
         },
       },
@@ -73,7 +125,13 @@ export const routes: Routes = [
         path: 'reportes',
         component: ReportesComponent,
         canActivate: [roleGuard],
-        data: { roles: ['ADMINISTRADOR'], disabled: true, pageTitle: 'Reportes' },
+        data: { roles: ['ADMINISTRADOR'], pageTitle: 'Reportes' },
+      },
+      {
+        path: 'feedback',
+        component: FeedbackComponent,
+        canActivate: [roleGuard],
+        data: { roles: ['ADMINISTRADOR'], pageTitle: 'Feedback' },
       },
       {
         path: 'auditoria',

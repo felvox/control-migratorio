@@ -70,11 +70,17 @@ export class AuthService {
       );
   }
 
-  logout(): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/auth/logout`, {}).pipe(
+  logout(motivoCierre: 'LOGOUT' | 'INACTIVIDAD' = 'LOGOUT'): Observable<void> {
+    return this.http
+      .post<void>(`${this.apiUrl}/auth/logout`, { motivoCierre })
+      .pipe(
       catchError(() => of(void 0)),
       tap(() => this.clearSession()),
-    );
+      );
+  }
+
+  clearLocalSession(): void {
+    this.clearSession();
   }
 
   me(): Observable<UsuarioSesion | null> {
@@ -133,6 +139,14 @@ export class AuthService {
 
     if (rol === 'AUDITOR') {
       return '/casos';
+    }
+
+    if (rol === 'CARABINEROS') {
+      return '/casos/por-revisar-carabineros';
+    }
+
+    if (rol === 'PDI') {
+      return '/casos/por-revisar-pdi';
     }
 
     return '/casos';

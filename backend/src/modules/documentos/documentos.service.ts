@@ -1,10 +1,9 @@
 import {
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Role, TipoEvidencia } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthUser } from '../../common/interfaces/auth-user.interface';
 import { AuditoriaService } from '../auditoria/auditoria.service';
@@ -17,6 +16,18 @@ import {
 import { createWriteStream, createReadStream, promises as fs } from 'fs';
 import { join, resolve } from 'path';
 import { randomUUID } from 'crypto';
+import { validarAccesoInstitucionalCaso } from '../casos/casos-acceso-institucional.utils';
+import {
+  detectarLesiones,
+  etiquetaJaf,
+  formatearFecha,
+  formatearHora,
+  formatearMesAbreviadoMayuscula,
+  limpiarObservacionesParaActa,
+  ordenarEvidenciasParaAnexo,
+  separarGradoYNombreFuncionario,
+  tituloTipoEvidencia,
+} from './documentos-presentacion.utils';
 
 @Injectable()
 export class DocumentosService {
@@ -65,17 +76,13 @@ export class DocumentosService {
       throw new NotFoundException('Caso no encontrado');
     }
 
-    if (user.role === Role.OPERADOR && caso.creadoPorId !== user.id) {
-      throw new ForbiddenException('No tiene permisos para este caso');
-    }
-
-    if (
-      user.role === Role.ADMINISTRADOR &&
-      !user.esMaster &&
-      (!user.jaf || caso.jaf !== user.jaf)
-    ) {
-      throw new ForbiddenException('No tiene permisos para casos de otra JAF');
-    }
+    validarAccesoInstitucionalCaso(caso, user, {
+      noPermisoPropio: 'No tiene permisos para este caso',
+      noPermisoJaf: 'No tiene permisos para casos de otra JAF',
+      noPermisoCarabineros:
+        'Solo puede consultar documentos de casos de Carabineros o seguimiento de menores derivados a PDI',
+      noPermisoPdi: 'Solo puede consultar documentos de casos derivados a PDI',
+    });
 
     return caso;
   }
@@ -83,8 +90,9 @@ export class DocumentosService {
   private async renderActaPDF(params: {
     rutaAbsoluta: string;
     caso: Awaited<ReturnType<DocumentosService['obtenerCasoConAcceso']>>;
+    usuarioGenerador: AuthUser;
   }) {
-    const { rutaAbsoluta, caso } = params;
+    const { rutaAbsoluta, caso, usuarioGenerador } = params;
 
     await new Promise<void>((resolvePromise, rejectPromise) => {
       const doc = new PDFDocument({
@@ -103,7 +111,7 @@ export class DocumentosService {
       const principal =
         caso.personas.find((p) => p.tipoPersona === 'PRINCIPAL') ?? caso.personas[0];
       const menores = caso.personas.filter((p) => p.tipoPersona === 'MENOR');
-      const observacionesLimpias = this.limpiarObservacionesParaActa(caso.observaciones);
+      const observacionesLimpias = limpiarObservacionesParaActa(caso.observaciones);
       let cursorY = top;
 
       const ensureSpace = (height: number) => {
@@ -119,7 +127,7 @@ export class DocumentosService {
         (texto ?? '').trim() || fallback;
       const procesado = new Date(caso.fechaHoraProcedimiento);
       const fechaIngreso = caso.fechaIngreso ? new Date(caso.fechaIngreso) : null;
-      const presentaLesiones = this.detectarLesiones(caso.estadoSalud);
+      const presentaLesiones = detectarLesiones(caso.estadoSalud);
 
       const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
         doc.moveTo(x1, y1).lineTo(x2, y2).strokeColor(lineColor).lineWidth(0.9).stroke();
@@ -240,9 +248,9 @@ export class DocumentosService {
         .font('Times-Roman')
         .fontSize(12)
         .text(
-          `En ${valor(caso.lugar, '___________')}, a las ${this.formatearHora(procesado)} hrs. del día ${String(
+          `En ${valor(caso.lugar, '___________')}, a las ${formatearHora(procesado)} hrs. del día ${String(
             procesado.getDate(),
-          ).padStart(2, '0')} del mes de ${this.formatearMesAbreviadoMayuscula(
+          ).padStart(2, '0')} del mes de ${formatearMesAbreviadoMayuscula(
             procesado,
           )} del año ${procesado.getFullYear()}, se hace entrega de:`,
           left,
@@ -273,7 +281,7 @@ export class DocumentosService {
       });
       cursorY += 17;
 
-      drawFieldLine(cursorY, 'Fecha de nacimiento', valor(principal ? this.formatearFecha(principal.fechaNacimiento) : ''), {
+      drawFieldLine(cursorY, 'Fecha de nacimiento', valor(principal ? formatearFecha(principal.fechaNacimiento) : ''), {
         lineEndX: left + 327,
       });
       drawFieldLine(cursorY, 'EDAD', valor(principal ? String(principal.edad) : ''), {
@@ -322,7 +330,7 @@ export class DocumentosService {
           drawFieldLine(
             cursorY,
             'F./Nacimiento',
-            valor(this.formatearFecha(menor.fechaNacimiento)),
+            valor(formatearFecha(menor.fechaNacimiento)),
             {
               lineEndX: left + 278,
             },
@@ -358,7 +366,7 @@ export class DocumentosService {
       drawFieldLine(
         cursorY,
         'Fecha de ingreso',
-        valor(fechaIngreso ? this.formatearFecha(fechaIngreso) : ''),
+        valor(fechaIngreso ? formatearFecha(fechaIngreso) : ''),
         {
           labelX: left + 314,
           colonX: left + 423,
@@ -442,9 +450,18 @@ export class DocumentosService {
       const receptor = caso.existenMenores
         ? 'FUNCIONARIO QUE RECIBE/ENTREGA DE CARABINEROS'
         : 'FUNCIONARIO QUE RECIBE/ENTREGA DE PDI';
-      const funcionarioEntrega = this.separarGradoYNombreFuncionario(
+      const funcionarioEntrega = separarGradoYNombreFuncionario(
         caso.creadoPor?.nombreCompleto,
       );
+      const debeCompletarReceptorCarabineros =
+        caso.existenMenores && usuarioGenerador.role === Role.CARABINEROS;
+      const funcionarioReceptor =
+        debeCompletarReceptorCarabineros
+          ? separarGradoYNombreFuncionario(usuarioGenerador.nombreCompleto)
+          : { grado: '', nombre: '' };
+      const unidadReceptor = debeCompletarReceptorCarabineros
+        ? etiquetaJaf(caso.jaf)
+        : '';
       const leftSignX = left;
       const rightSignX = left + firmaBlockWidth;
       const firmaHeaderHeight = 24;
@@ -497,6 +514,8 @@ export class DocumentosService {
 
       firmaRows.forEach((_, rowIndex) => {
         let valorColumnaIzquierda = '';
+        let valorColumnaDerecha = '';
+
         if (rowIndex === 1) {
           valorColumnaIzquierda =
             funcionarioEntrega.nombre || valor(caso.creadoPor?.nombreCompleto);
@@ -504,8 +523,18 @@ export class DocumentosService {
           valorColumnaIzquierda = funcionarioEntrega.grado;
         }
 
+        if (rowIndex === 1) {
+          valorColumnaDerecha = debeCompletarReceptorCarabineros
+            ? funcionarioReceptor.nombre || usuarioGenerador.nombreCompleto
+            : '';
+        } else if (rowIndex === 2) {
+          valorColumnaDerecha = funcionarioReceptor.grado;
+        } else if (rowIndex === 3) {
+          valorColumnaDerecha = unidadReceptor;
+        }
+
         drawFirmaRow(leftSignX, rowIndex, valorColumnaIzquierda);
-        drawFirmaRow(rightSignX, rowIndex);
+        drawFirmaRow(rightSignX, rowIndex, valorColumnaDerecha);
       });
 
       doc.end();
@@ -515,41 +544,6 @@ export class DocumentosService {
     });
 
     await this.anexarEvidenciasAlPdf(rutaAbsoluta, caso.evidencias);
-  }
-
-  private ordenarEvidenciasParaAnexo(
-    evidencias: Awaited<
-      ReturnType<DocumentosService['obtenerCasoConAcceso']>
-    >['evidencias'],
-  ) {
-    const prioridadTipo: Record<TipoEvidencia, number> = {
-      [TipoEvidencia.DOCUMENTO_IDENTIDAD]: 0,
-      [TipoEvidencia.FOTO_PERSONA]: 1,
-      [TipoEvidencia.ADJUNTO_GENERAL]: 2,
-    };
-
-    return [...evidencias].sort((a, b) => {
-      const prioridadA = prioridadTipo[a.tipoEvidencia] ?? 99;
-      const prioridadB = prioridadTipo[b.tipoEvidencia] ?? 99;
-
-      if (prioridadA !== prioridadB) {
-        return prioridadA - prioridadB;
-      }
-
-      return a.creadoAt.getTime() - b.creadoAt.getTime();
-    });
-  }
-
-  private tituloTipoEvidencia(tipo: TipoEvidencia) {
-    if (tipo === TipoEvidencia.DOCUMENTO_IDENTIDAD) {
-      return 'Documento de identidad';
-    }
-
-    if (tipo === TipoEvidencia.FOTO_PERSONA) {
-      return 'Fotografía de persona';
-    }
-
-    return 'Adjunto general';
   }
 
   private async anexarEvidenciasAlPdf(
@@ -562,7 +556,7 @@ export class DocumentosService {
       return;
     }
 
-    const evidenciasOrdenadas = this.ordenarEvidenciasParaAnexo(evidencias);
+    const evidenciasOrdenadas = ordenarEvidenciasParaAnexo(evidencias);
     const basePdfBytes = await fs.readFile(rutaAbsoluta);
     const pdfFinal = await PDFLibDocument.load(basePdfBytes);
     const fontTitulo = await pdfFinal.embedFont(StandardFonts.HelveticaBold);
@@ -671,8 +665,8 @@ export class DocumentosService {
           const [paginaAdjunta] = await pdfFinal.embedPdf(contenidoBytes, [paginaAdjuntaIndex]);
           const { pagina, slotY } = tomarSiguienteSlot();
           const subtitulo = totalPaginas > 1
-            ? `${index + 1}. ${this.tituloTipoEvidencia(evidencia.tipoEvidencia)} - ${evidencia.nombreOriginal} (${paginaAdjuntaIndex + 1}/${totalPaginas})`
-            : `${index + 1}. ${this.tituloTipoEvidencia(evidencia.tipoEvidencia)} - ${evidencia.nombreOriginal}`;
+            ? `${index + 1}. ${tituloTipoEvidencia(evidencia.tipoEvidencia)} - ${evidencia.nombreOriginal} (${paginaAdjuntaIndex + 1}/${totalPaginas})`
+            : `${index + 1}. ${tituloTipoEvidencia(evidencia.tipoEvidencia)} - ${evidencia.nombreOriginal}`;
 
           const { frameX, frameY, frameWidth, frameHeight } = dibujarMarcoSlot(
             pagina,
@@ -702,7 +696,7 @@ export class DocumentosService {
       }
 
       const { pagina, slotY } = tomarSiguienteSlot();
-      const etiqueta = `${index + 1}. ${this.tituloTipoEvidencia(
+      const etiqueta = `${index + 1}. ${tituloTipoEvidencia(
         evidencia.tipoEvidencia,
       )} - ${evidencia.nombreOriginal}`;
       const { frameX, frameY, frameWidth, frameHeight } = dibujarMarcoSlot(
@@ -734,7 +728,13 @@ export class DocumentosService {
         continue;
       }
 
-      pagina.drawText('Formato no soportado para previsualización en anexo.', {
+      const mensajeNoPrevisualizable =
+        mime === 'application/msword' ||
+        mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          ? 'Documento Word cargado. Disponible para descarga desde evidencias.'
+          : 'Formato no soportado para previsualización en anexo.';
+
+      pagina.drawText(mensajeNoPrevisualizable, {
         x: frameX + 12,
         y: frameY + frameHeight / 2,
         size: 11,
@@ -745,179 +745,6 @@ export class DocumentosService {
 
     const pdfBytesFinales = await pdfFinal.save();
     await fs.writeFile(rutaAbsoluta, pdfBytesFinales);
-  }
-
-  private etiquetaTipoControl(tipo: string): string {
-    if (tipo === 'INGRESO') {
-      return 'Ingresando a territorio nacional';
-    }
-
-    if (tipo === 'EGRESO') {
-      return 'Egresando de territorio nacional';
-    }
-
-    return 'No informado';
-  }
-
-  private etiquetaEstado(estado: string): string {
-    if (estado === 'DERIVADO_CARABINEROS') {
-      return 'Derivado Carabineros';
-    }
-
-    if (estado === 'DERIVADO_PDI') {
-      return 'Derivado PDI';
-    }
-
-    if (estado === 'CERRADO') {
-      return 'Cerrado';
-    }
-
-    return 'Pendiente';
-  }
-
-  private etiquetaInstitucion(institucion: string): string {
-    if (institucion === 'CARABINEROS') {
-      return 'Carabineros';
-    }
-
-    if (institucion === 'PDI') {
-      return 'PDI';
-    }
-
-    return 'Ninguna';
-  }
-
-  private formatearFechaHora(fecha: Date | string): string {
-    const fechaValida = this.parseFecha(fecha);
-    if (!fechaValida) {
-      return '';
-    }
-
-    return fechaValida.toLocaleString('es-CL');
-  }
-
-  private formatearFecha(fecha: Date | string): string {
-    const fechaValida = this.parseFecha(fecha);
-    if (!fechaValida) {
-      return '';
-    }
-
-    const dia = String(fechaValida.getUTCDate()).padStart(2, '0');
-    const mes = String(fechaValida.getUTCMonth() + 1).padStart(2, '0');
-    const ano = fechaValida.getUTCFullYear();
-
-    return `${dia}-${mes}-${ano}`;
-  }
-
-  private formatearHora(fecha: Date | string): string {
-    const fechaValida = this.parseFecha(fecha);
-    if (!fechaValida) {
-      return '';
-    }
-
-    return fechaValida.toLocaleTimeString('es-CL', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-  }
-
-  private formatearMesAbreviadoMayuscula(fecha: Date | string): string {
-    const fechaValida = this.parseFecha(fecha);
-    if (!fechaValida) {
-      return '';
-    }
-
-    return fechaValida
-      .toLocaleDateString('es-CL', { month: 'short' })
-      .replace('.', '')
-      .trim()
-      .toUpperCase();
-  }
-
-  private parseFecha(fecha: Date | string): Date | null {
-    const parsed = new Date(fecha);
-    if (Number.isNaN(parsed.getTime())) {
-      return null;
-    }
-
-    return parsed;
-  }
-
-  private detectarLesiones(estadoSalud: string | null | undefined): boolean {
-    if (!estadoSalud) {
-      return false;
-    }
-
-    const normalizado = estadoSalud
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-
-    if (normalizado.includes('sin lesion')) {
-      return false;
-    }
-
-    return normalizado.includes('lesion');
-  }
-
-  private limpiarObservacionesParaActa(observaciones: string | null | undefined): string {
-    if (!observaciones) {
-      return '';
-    }
-
-    const marcadorConformidad = '[CONFORMIDAD_SISTEMA]';
-    const markerIndex = observaciones.indexOf(marcadorConformidad);
-
-    if (markerIndex < 0) {
-      return observaciones.trim();
-    }
-
-    return observaciones.slice(0, markerIndex).trim();
-  }
-
-  private separarGradoYNombreFuncionario(
-    nombreCompleto: string | null | undefined,
-  ): { grado: string; nombre: string } {
-    const limpio = (nombreCompleto ?? '').trim().replace(/\s+/g, ' ');
-    if (!limpio) {
-      return { grado: '', nombre: '' };
-    }
-
-    const gradosCompuestos = [
-      'General de Ejército',
-      'General de División',
-      'General de Brigada',
-      'Teniente Coronel',
-      'Sub Oficial Mayor',
-      'Sub Oficial',
-      'Sargento Primero',
-      'Sargento Segundo',
-      'Cabo Primero',
-      'Cabo Segundo',
-    ];
-
-    const limpioLower = limpio.toLowerCase();
-    const gradoCompuesto = gradosCompuestos.find((grado) =>
-      limpioLower.startsWith(grado.toLowerCase()),
-    );
-
-    if (gradoCompuesto) {
-      return {
-        grado: gradoCompuesto,
-        nombre: limpio.slice(gradoCompuesto.length).trim(),
-      };
-    }
-
-    const partes = limpio.split(' ');
-    if (partes.length === 1) {
-      return { grado: partes[0] ?? '', nombre: '' };
-    }
-
-    return {
-      grado: partes[0] ?? '',
-      nombre: partes.slice(1).join(' ').trim(),
-    };
   }
 
   async generarActaPdf(
@@ -939,6 +766,7 @@ export class DocumentosService {
     await this.renderActaPDF({
       rutaAbsoluta,
       caso,
+      usuarioGenerador: user,
     });
 
     const stats = await fs.stat(rutaAbsoluta);
@@ -998,6 +826,8 @@ export class DocumentosService {
             codigo: true,
             creadoPorId: true,
             jaf: true,
+            institucionDerivacion: true,
+            existenMenores: true,
           },
         },
       },
@@ -1007,17 +837,13 @@ export class DocumentosService {
       throw new NotFoundException('Documento no encontrado');
     }
 
-    if (user.role === Role.OPERADOR && documento.caso.creadoPorId !== user.id) {
-      throw new ForbiddenException('No tiene permisos para este documento');
-    }
-
-    if (
-      user.role === Role.ADMINISTRADOR &&
-      !user.esMaster &&
-      (!user.jaf || documento.caso.jaf !== user.jaf)
-    ) {
-      throw new ForbiddenException('No tiene permisos para documentos de otra JAF');
-    }
+    validarAccesoInstitucionalCaso(documento.caso, user, {
+      noPermisoPropio: 'No tiene permisos para este documento',
+      noPermisoJaf: 'No tiene permisos para documentos de otra JAF',
+      noPermisoCarabineros:
+        'Solo puede consultar documentos de casos de Carabineros o seguimiento de menores derivados a PDI',
+      noPermisoPdi: 'Solo puede consultar documentos de casos derivados a PDI',
+    });
 
     const rutaAbsoluta = join(this.storageRoot, documento.rutaArchivo);
 

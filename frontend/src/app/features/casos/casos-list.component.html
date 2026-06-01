@@ -1,0 +1,88 @@
+    <div class="page-grid">
+      <article class="card">
+        <form [formGroup]="filtrosForm" class="form-grid" (ngSubmit)="buscar()">
+          <div>
+            <label>Nombre</label>
+            <input formControlName="nombre" />
+          </div>
+          <div *ngIf="!esConsultaHistoricaInstitucional">
+            <label>Documento</label>
+            <input formControlName="documento" />
+          </div>
+          <div>
+            <label>{{ esConsultaHistoricaInstitucional ? 'Lugar' : 'Ubicación' }}</label>
+            <input formControlName="ubicacion" />
+          </div>
+          <div *ngIf="esConsultaHistoricaInstitucional">
+            <label>Fecha</label>
+            <input type="date" formControlName="fecha" />
+          </div>
+          <div *ngIf="!ocultarFiltroEstado && !esConsultaHistoricaInstitucional">
+            <label>Estado</label>
+            <select formControlName="estado">
+              <option value="">Todos</option>
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="DERIVADO_CARABINEROS">Derivado Carabineros</option>
+              <option value="DERIVADO_PDI">Derivado PDI</option>
+              <option value="CERRADO">Cerrado</option>
+            </select>
+          </div>
+          <div style="align-self: end; display: flex; gap: 0.5rem;">
+            <button class="btn-primary">Buscar</button>
+            <button type="button" class="btn-secondary" (click)="limpiar()">
+              Limpiar
+            </button>
+          </div>
+        </form>
+      </article>
+
+      <article class="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Lugar</th>
+              <th>Estado</th>
+              <th>Principal</th>
+              <th>Operador</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let caso of casos">
+              <td>{{ caso.codigo }}</td>
+              <td>{{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td>{{ etiquetaTipoControl(caso.tipoControl) }}</td>
+              <td>{{ caso.lugar }}</td>
+              <td>
+                <span class="case-status-badge" [ngClass]="estadoClase(caso.estado)">
+                  {{ etiquetaEstado(caso.estado) }}
+                </span>
+              </td>
+              <td>
+                {{ obtenerPrincipal(caso).nombres }} {{ obtenerPrincipal(caso).apellidos }}
+              </td>
+              <td>{{ caso.creadoPor.nombreCompleto }}</td>
+              <td>
+                <button
+                  class="btn-secondary"
+                  (click)="verDetalle(caso.id)"
+                >
+                  Ver
+                </button>
+                <button
+                  class="btn-secondary"
+                  *ngIf="puedeEditarCaso(caso)"
+                  (click)="editar(caso.id)"
+                >
+                  Editar
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
+    </div>
+  

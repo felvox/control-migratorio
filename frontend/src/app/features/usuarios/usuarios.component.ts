@@ -20,572 +20,20 @@ import { ProgressivePasswordMaskDirective } from '../../shared/directives/progre
 
 type ModalUsuarios = 'CREAR' | 'RESET' | 'DESACTIVAR' | 'ACTIVAR' | 'ELIMINAR' | null;
 type Jaf = 'TARAPACA' | 'ANTOFAGASTA' | 'ARICA_PARINACOTA';
-type RolUsuario = 'ADMINISTRADOR' | 'OPERADOR' | 'CONSULTA' | 'AUDITOR';
+type RolUsuario =
+  | 'ADMINISTRADOR'
+  | 'OPERADOR'
+  | 'CONSULTA'
+  | 'AUDITOR'
+  | 'CARABINEROS'
+  | 'PDI';
 
 @Component({
   selector: 'app-usuarios',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, AlertModalComponent, ProgressivePasswordMaskDirective],
-  template: `
-    <div class="page-grid usuarios-page">
-      <article class="card acciones-card">
-        <div class="acciones-row">
-          <button class="btn-primary" type="button" (click)="abrirModal('CREAR')">
-            Crear usuario
-          </button>
-          <button
-            class="btn-secondary"
-            type="button"
-            [disabled]="!puedeResetearSeleccionado"
-            (click)="abrirModal('RESET')"
-          >
-            Resetear clave
-          </button>
-          <button
-            class="btn-secondary"
-            type="button"
-            [disabled]="!puedeDesactivarSeleccionado"
-            (click)="abrirModal('DESACTIVAR')"
-          >
-            Desactivar
-          </button>
-          <button
-            class="btn-success"
-            type="button"
-            *ngIf="puedeActivarSeleccionado"
-            (click)="abrirModal('ACTIVAR')"
-          >
-            Activar
-          </button>
-          <button
-            class="btn-danger"
-            type="button"
-            [disabled]="!puedeEliminarSeleccionado"
-            (click)="abrirModal('ELIMINAR')"
-          >
-            Eliminar
-          </button>
-        </div>
-      </article>
-
-      <article class="card">
-        <div class="list-header">
-          <h3>Listado de usuarios</h3>
-          <input
-            [value]="busqueda"
-            (input)="onBuscar($event)"
-            placeholder="Buscar por nombre o RUN"
-          />
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="select-col"></th>
-                <th>Nombre</th>
-                <th>RUN</th>
-                <th>Rol</th>
-                <th>JAF</th>
-                <th>Estado</th>
-                <th>Último acceso</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                *ngFor="let usuario of usuarios"
-                [class.row-selected]="isUsuarioSeleccionadoListado(usuario.id)"
-              >
-                <td class="select-col">
-                  <input
-                    type="radio"
-                    name="usuarioListado"
-                    [checked]="isUsuarioSeleccionadoListado(usuario.id)"
-                    (change)="seleccionarUsuarioListado(usuario.id)"
-                  />
-                </td>
-                <td>{{ usuario.nombreCompleto }}</td>
-                <td>{{ formatRun(usuario.run) }}</td>
-                <td>{{ usuario.rol }}</td>
-                <td>{{ etiquetaJaf(usuario.jaf) }}</td>
-                <td>
-                  <span class="badge" [class.success]="usuario.activo">
-                    {{ usuario.activo ? 'Activo' : 'Inactivo' }}
-                  </span>
-                </td>
-                <td>
-                  {{
-                    usuario.ultimoAcceso
-                      ? (usuario.ultimoAcceso | date: 'dd/MM/yyyy HH:mm')
-                      : '-'
-                  }}
-                </td>
-              </tr>
-
-              <tr *ngIf="usuarios.length === 0">
-                <td colspan="7" class="empty-cell">No hay usuarios para mostrar.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
-
-      <div class="modal-backdrop" *ngIf="modalAbierto">
-        <section class="modal-card" [ngSwitch]="modalAbierto" role="dialog" aria-modal="true">
-          <ng-container *ngSwitchCase="'CREAR'">
-            <h3>Crear usuario</h3>
-            <form [formGroup]="formCrear" (ngSubmit)="confirmarCrear()" class="page-grid">
-              <div class="form-grid">
-                <div>
-                  <label>RUN</label>
-                  <input
-                    formControlName="run"
-                    type="text"
-                    placeholder="12.345.678-5"
-                    (input)="onRunInputCrear($event)"
-                  />
-                </div>
-
-                <div>
-                  <label>Grado</label>
-                  <input formControlName="grado" type="text" placeholder="Ej: Mayor" />
-                </div>
-
-                <div>
-                  <label>Nombre</label>
-                  <input formControlName="nombre" type="text" />
-                </div>
-
-                <div>
-                  <label>Apellidos</label>
-                  <input formControlName="apellidos" type="text" />
-                </div>
-
-                <div>
-                  <label>Rol</label>
-                  <select formControlName="rol" (change)="onRolCrearChange()">
-                    <option *ngFor="let rolOption of rolesDisponiblesCrear" [value]="rolOption.valor">
-                      {{ rolOption.etiqueta }}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label>JAF</label>
-                  <select formControlName="jaf" [disabled]="!requiereJafCrear || !puedeEditarJafCrear">
-                    <option value="">Seleccionar JAF</option>
-                    <option *ngFor="let option of jafOptions" [value]="option.valor">
-                      {{ option.etiqueta }}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label>Contraseña temporal</label>
-                  <div class="password-field">
-                    <input
-                      formControlName="password"
-                      [type]="mostrarPasswordCrear ? 'text' : 'password'"
-                      [appProgressivePasswordMask]="!mostrarPasswordCrear"
-                    />
-                    <button
-                      type="button"
-                      class="password-toggle"
-                      (click)="mostrarPasswordCrear = !mostrarPasswordCrear"
-                    >
-                      {{ mostrarPasswordCrear ? 'Ocultar' : 'Mostrar' }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="modal-actions">
-                <button type="button" class="btn-secondary" [disabled]="loadingModal" (click)="cerrarModal()">
-                  Cancelar
-                </button>
-                <button class="btn-primary" [disabled]="loadingModal">
-                  {{ loadingModal ? 'Guardando...' : 'Crear usuario' }}
-                </button>
-              </div>
-            </form>
-          </ng-container>
-
-          <ng-container *ngSwitchCase="'RESET'">
-            <h3>Resetear clave</h3>
-
-            <form [formGroup]="formReset" (ngSubmit)="confirmarResetClave()" class="page-grid">
-              <p class="modal-text" *ngIf="usuarioSeleccionado as seleccionado">
-                Usuario: <strong>{{ seleccionado.nombreCompleto }}</strong>
-                ({{ formatRun(seleccionado.run) }})
-              </p>
-
-              <div>
-                <label>Nueva contraseña</label>
-                <div class="password-field">
-                  <input
-                    formControlName="nuevaPassword"
-                    [type]="mostrarPasswordReset ? 'text' : 'password'"
-                    [appProgressivePasswordMask]="!mostrarPasswordReset"
-                  />
-                  <button
-                    type="button"
-                    class="password-toggle"
-                    (click)="mostrarPasswordReset = !mostrarPasswordReset"
-                  >
-                    {{ mostrarPasswordReset ? 'Ocultar' : 'Mostrar' }}
-                  </button>
-                </div>
-              </div>
-
-              <div class="modal-actions">
-                <button type="button" class="btn-secondary" [disabled]="loadingModal" (click)="cerrarModal()">
-                  Cancelar
-                </button>
-                <button class="btn-primary" [disabled]="loadingModal">
-                  {{ loadingModal ? 'Guardando...' : 'Actualizar clave' }}
-                </button>
-              </div>
-            </form>
-          </ng-container>
-
-          <ng-container *ngSwitchCase="'DESACTIVAR'">
-            <h3>Desactivar usuario</h3>
-            <form [formGroup]="formDesactivar" (ngSubmit)="confirmarDesactivar()" class="page-grid">
-              <p *ngIf="usuarioSeleccionado as seleccionado" class="modal-text">
-                ¿Seguro que deseas desactivar a
-                <strong>{{ seleccionado.nombreCompleto }}</strong>
-                ({{ formatRun(seleccionado.run) }})?
-              </p>
-
-              <div class="modal-actions">
-                <button type="button" class="btn-secondary" [disabled]="loadingModal" (click)="cerrarModal()">
-                  Cancelar
-                </button>
-                <button class="btn-danger" [disabled]="loadingModal || formDesactivar.invalid">
-                  {{ loadingModal ? 'Desactivando...' : 'Desactivar' }}
-                </button>
-              </div>
-            </form>
-          </ng-container>
-
-          <ng-container *ngSwitchCase="'ACTIVAR'">
-            <h3>Activar usuario</h3>
-            <form [formGroup]="formActivar" (ngSubmit)="confirmarActivar()" class="page-grid">
-              <p *ngIf="usuarioSeleccionado as seleccionado" class="modal-text">
-                ¿Seguro que deseas activar nuevamente a
-                <strong>{{ seleccionado.nombreCompleto }}</strong>
-                ({{ formatRun(seleccionado.run) }})?
-              </p>
-
-              <div class="modal-actions">
-                <button type="button" class="btn-secondary" [disabled]="loadingModal" (click)="cerrarModal()">
-                  Cancelar
-                </button>
-                <button class="btn-success" [disabled]="loadingModal || formActivar.invalid">
-                  {{ loadingModal ? 'Activando...' : 'Activar' }}
-                </button>
-              </div>
-            </form>
-          </ng-container>
-
-          <ng-container *ngSwitchCase="'ELIMINAR'">
-            <h3>Eliminar usuario</h3>
-            <form [formGroup]="formEliminar" (ngSubmit)="confirmarEliminar()" class="page-grid">
-              <p *ngIf="usuarioSeleccionado as seleccionado" class="modal-text">
-                Esta acción elimina lógicamente al usuario
-                <strong>{{ seleccionado.nombreCompleto }}</strong>
-                ({{ formatRun(seleccionado.run) }}).
-              </p>
-
-              <div class="modal-actions">
-                <button type="button" class="btn-secondary" [disabled]="loadingModal" (click)="cerrarModal()">
-                  Cancelar
-                </button>
-                <button class="btn-danger" [disabled]="loadingModal || formEliminar.invalid">
-                  {{ loadingModal ? 'Eliminando...' : 'Eliminar' }}
-                </button>
-              </div>
-            </form>
-          </ng-container>
-        </section>
-      </div>
-
-      <app-alert-modal
-        [open]="alertExitoAbierto"
-        title="Operación completada"
-        [message]="alertaExitoMensaje"
-        variant="success"
-        (accepted)="cerrarAlertaExito()"
-      />
-
-      <app-alert-modal
-        [open]="alertAvisoAbierto"
-        title="Revisa la información"
-        [message]="alertaAvisoMensaje"
-        variant="warning"
-        (accepted)="cerrarAlertaAviso()"
-      />
-    </div>
-  `,
-  styles: [
-    `
-      h3 {
-        margin: 0;
-      }
-
-      .usuarios-page {
-        max-width: 1320px;
-      }
-
-      .acciones-card {
-        display: grid;
-        gap: 0.6rem;
-      }
-
-      .acciones-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-      }
-
-      .btn-success {
-        background: #e9f8ef;
-        color: #1c7a4a;
-        border: 1px solid #a8dbba;
-      }
-
-      .list-header {
-        display: flex;
-        gap: 0.8rem;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.8rem;
-      }
-
-      .list-header input {
-        max-width: 360px;
-      }
-
-      .select-col {
-        width: 42px;
-        text-align: center;
-      }
-
-      .select-col input[type='radio'] {
-        width: 16px;
-        height: 16px;
-        padding: 0;
-        margin: 0;
-        border: 0;
-        border-radius: 50%;
-        background: transparent;
-        appearance: auto;
-        -webkit-appearance: radio;
-        accent-color: #2f6dc8;
-        cursor: pointer;
-      }
-
-      .row-selected {
-        background: #eef5ff;
-      }
-
-      tbody tr {
-        cursor: default;
-      }
-
-      .empty-cell {
-        text-align: center;
-        color: var(--color-muted);
-      }
-
-      .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(10, 21, 34, 0.52);
-        backdrop-filter: blur(2px);
-        display: grid;
-        place-items: center;
-        padding: 1rem;
-        z-index: 1200;
-      }
-
-      .modal-card {
-        width: min(760px, 100%);
-        background: #fff;
-        border: 1px solid #d7e0ea;
-        border-radius: 14px;
-        box-shadow: 0 16px 48px rgba(10, 29, 54, 0.22);
-        padding: 1rem;
-        display: grid;
-        gap: 0.8rem;
-      }
-
-      .modal-text {
-        margin: 0;
-        font-size: 0.92rem;
-        color: #42556a;
-      }
-
-      .password-field {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: 0.45rem;
-      }
-
-      .password-toggle {
-        border: 1px solid #c7d2df;
-        background: #f8fafc;
-        color: #25354a;
-        border-radius: 10px;
-        padding: 0.35rem 0.7rem;
-        font-size: 0.82rem;
-        font-weight: 600;
-        cursor: pointer;
-      }
-
-      .password-toggle:hover {
-        background: #eef3f9;
-      }
-
-      .usuarios-selector-scroll {
-        max-height: 260px;
-        overflow: auto;
-        border: 1px solid #d7e0ea;
-        border-radius: 10px;
-        background: #f8fafd;
-        padding: 0.45rem;
-        display: grid;
-        gap: 0.45rem;
-      }
-
-      .rol-group {
-        border: 1px solid #d9e3ee;
-        border-radius: 9px;
-        overflow: hidden;
-        background: #fff;
-      }
-
-      .rol-toggle {
-        width: 100%;
-        border: none;
-        border-bottom: 1px solid #e7edf5;
-        background: #f3f7fc;
-        color: #23364b;
-        padding: 0.55rem 0.68rem;
-        font-weight: 650;
-        font-size: 0.92rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        cursor: pointer;
-      }
-
-      .rol-toggle .chevron {
-        transition: transform 120ms ease;
-      }
-
-      .rol-toggle.expanded .chevron {
-        transform: rotate(180deg);
-      }
-
-      .rol-items {
-        display: grid;
-        gap: 0.35rem;
-        padding: 0.45rem;
-      }
-
-      .usuario-item {
-        border: 1px solid #d8e3ef;
-        border-radius: 8px;
-        background: #fff;
-        padding: 0.44rem 0.56rem;
-        text-align: left;
-        display: grid;
-        gap: 0.08rem;
-        cursor: pointer;
-      }
-
-      .usuario-item:hover {
-        background: #f4f8ff;
-        border-color: #9dbbe6;
-      }
-
-      .usuario-item.active {
-        background: #e9f2ff;
-        border-color: #2f6dc8;
-      }
-
-      .usuario-item-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #1f3146;
-      }
-
-      .usuario-item-sub {
-        font-size: 0.81rem;
-        color: #58708b;
-      }
-
-      .usuario-radio {
-        border: 1px solid #d8e3ef;
-        border-radius: 8px;
-        background: #fff;
-        padding: 0.44rem 0.56rem;
-        display: grid;
-        grid-template-columns: 18px 1fr;
-        gap: 0.5rem;
-        align-items: start;
-        cursor: pointer;
-      }
-
-      .usuario-radio:hover {
-        background: #f4f8ff;
-        border-color: #9dbbe6;
-      }
-
-      .usuario-radio.active {
-        background: #e9f2ff;
-        border-color: #2f6dc8;
-      }
-
-      .usuario-radio input[type='radio'] {
-        width: 16px;
-        height: 16px;
-        padding: 0;
-        margin: 0.18rem 0 0;
-        border: 0;
-        border-radius: 50%;
-        background: transparent;
-        appearance: auto;
-        -webkit-appearance: radio;
-        accent-color: #2f6dc8;
-        cursor: pointer;
-      }
-
-      .usuario-radio-content {
-        display: grid;
-        gap: 0.08rem;
-      }
-
-      .modal-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.45rem;
-      }
-
-      @media (max-width: 860px) {
-        .list-header {
-          flex-direction: column;
-          align-items: stretch;
-        }
-
-        .list-header input {
-          max-width: none;
-        }
-      }
-    `,
-  ],
+  templateUrl: './usuarios.component.html',
+  styleUrl: './usuarios.component.css',
 })
 export class UsuariosComponent implements OnInit {
   private readonly usuariosService = inject(UsuariosService);
@@ -616,11 +64,15 @@ export class UsuariosComponent implements OnInit {
     { valor: 'ADMINISTRADOR', etiqueta: 'Administrador' },
     { valor: 'OPERADOR', etiqueta: 'Operador' },
     { valor: 'CONSULTA', etiqueta: 'Consulta' },
+    { valor: 'CARABINEROS', etiqueta: 'Carabineros' },
+    { valor: 'PDI', etiqueta: 'PDI' },
     { valor: 'AUDITOR', etiqueta: 'Auditor' },
   ];
   readonly rolesOperativo: Array<{ valor: RolUsuario; etiqueta: string }> = [
     { valor: 'OPERADOR', etiqueta: 'Operador' },
     { valor: 'CONSULTA', etiqueta: 'Consulta' },
+    { valor: 'CARABINEROS', etiqueta: 'Carabineros' },
+    { valor: 'PDI', etiqueta: 'PDI' },
   ];
 
   readonly formCrear = this.fb.group({
@@ -687,7 +139,13 @@ export class UsuariosComponent implements OnInit {
 
   get requiereJafCrear(): boolean {
     const rol = this.formCrear.get('rol')?.value;
-    return rol === 'ADMINISTRADOR' || rol === 'OPERADOR' || rol === 'CONSULTA';
+    return (
+      rol === 'ADMINISTRADOR' ||
+      rol === 'OPERADOR' ||
+      rol === 'CONSULTA' ||
+      rol === 'CARABINEROS' ||
+      rol === 'PDI'
+    );
   }
 
   get esAdminMasterActual(): boolean {
@@ -841,7 +299,11 @@ export class UsuariosComponent implements OnInit {
       return;
     }
     const requiereJaf =
-      rol === 'ADMINISTRADOR' || rol === 'OPERADOR' || rol === 'CONSULTA';
+      rol === 'ADMINISTRADOR' ||
+      rol === 'OPERADOR' ||
+      rol === 'CONSULTA' ||
+      rol === 'CARABINEROS' ||
+      rol === 'PDI';
     const jafOperativo = this.jafAdminOperativo;
     const jaf =
       requiereJaf && raw.jaf

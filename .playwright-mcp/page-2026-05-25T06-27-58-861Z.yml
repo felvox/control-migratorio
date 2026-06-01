@@ -1,0 +1,65 @@
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - img "Logo institucional" [ref=e8]
+      - generic [ref=e9]:
+        - heading "Control Migratorio" [level=1] [ref=e10]
+        - paragraph [ref=e11]: JAF TARAPACÁ
+    - button "Ocultar barra lateral" [ref=e12] [cursor=pointer]:
+      - img [ref=e13]
+    - navigation [ref=e16]:
+      - link "Crear Caso" [ref=e17] [cursor=pointer]:
+        - /url: /casos/nuevo
+        - img [ref=e19]
+        - generic [ref=e22]: Crear Caso
+      - link "Consultar Casos" [ref=e23] [cursor=pointer]:
+        - /url: /casos
+        - img [ref=e25]
+        - generic [ref=e28]: Consultar Casos
+    - button "Cerrar sesión" [ref=e30] [cursor=pointer]:
+      - img [ref=e31]
+      - generic [ref=e34]: Cerrar sesión
+  - main [ref=e35]:
+    - generic [ref=e36]:
+      - heading "Casos" [level=2] [ref=e38]
+      - generic [ref=e39]:
+        - button "Operador JAF Tarapacá" [ref=e40] [cursor=pointer]:
+          - img [ref=e42]
+          - strong [ref=e45]: Operador JAF Tarapacá
+        - button "OPERADOR" [ref=e46] [cursor=pointer]
+    - generic [ref=e49]:
+      - article [ref=e50]:
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - generic [ref=e53]: Nombre
+            - textbox [ref=e54]
+          - generic [ref=e55]:
+            - generic [ref=e56]: Documento
+            - textbox [ref=e57]
+          - generic [ref=e58]:
+            - generic [ref=e59]: Ubicación
+            - textbox [ref=e60]
+          - generic [ref=e61]:
+            - generic [ref=e62]: Estado
+            - combobox [ref=e63]:
+              - option "Todos" [selected]
+              - option "Pendiente"
+              - option "Derivado Carabineros"
+              - option "Derivado PDI"
+              - option "Cerrado"
+          - generic [ref=e64]:
+            - button "Buscar" [ref=e65] [cursor=pointer]
+            - button "Limpiar" [ref=e66] [cursor=pointer]
+      - article [ref=e67]:
+        - table [ref=e68]:
+          - rowgroup [ref=e69]:
+            - row "Código Fecha Tipo Lugar Estado Principal Operador" [ref=e70]:
+              - columnheader "Código" [ref=e71]
+              - columnheader "Fecha" [ref=e72]
+              - columnheader "Tipo" [ref=e73]
+              - columnheader "Lugar" [ref=e74]
+              - columnheader "Estado" [ref=e75]
+              - columnheader "Principal" [ref=e76]
+              - columnheader "Operador" [ref=e77]
+              - columnheader [ref=e78]
+          - rowgroup

@@ -1,0 +1,154 @@
+- generic [ref=e101]:
+  - complementary [ref=e102]:
+    - generic [ref=e103]:
+      - img "Logo institucional" [ref=e105]
+      - generic [ref=e106]:
+        - heading "Control Migratorio" [level=1] [ref=e107]
+        - paragraph [ref=e108]: JAF TARAPACÁ
+    - button "Ocultar barra lateral" [ref=e109] [cursor=pointer]:
+      - img [ref=e110]
+    - navigation [ref=e113]:
+      - link "Crear Caso" [ref=e114] [cursor=pointer]:
+        - /url: /casos/nuevo
+        - img [ref=e116]
+        - generic [ref=e119]: Crear Caso
+      - link "Consultar Casos" [ref=e120] [cursor=pointer]:
+        - /url: /casos
+        - img [ref=e122]
+        - generic [ref=e125]: Consultar Casos
+    - button "Cerrar sesión" [ref=e127] [cursor=pointer]:
+      - img [ref=e128]
+      - generic [ref=e131]: Cerrar sesión
+  - main [ref=e132]:
+    - generic [ref=e133]:
+      - heading "Detalle de caso" [level=2] [ref=e135]
+      - generic [ref=e136]:
+        - button "Operador JAF Tarapacá" [ref=e137] [cursor=pointer]:
+          - img [ref=e139]
+          - strong [ref=e142]: Operador JAF Tarapacá
+        - button "OPERADOR" [ref=e143] [cursor=pointer]
+    - generic [ref=e146]:
+      - generic [ref=e147]:
+        - generic [ref=e148]:
+          - paragraph [ref=e149]: Detalle operativo
+          - heading "CM-20260525-8491" [level=2] [ref=e150]
+          - paragraph [ref=e151]: Ingresando · 25/05/2026 01:20 · Antofagasta
+          - generic [ref=e152]:
+            - generic [ref=e153]: Pendiente
+            - generic [ref=e154]: Derivación a Carabineros
+            - generic [ref=e155]: JAF Tarapacá
+            - generic [ref=e156]: "Creado: 25/05/2026 01:31"
+        - generic [ref=e157]:
+          - button "Generar PDF" [ref=e158] [cursor=pointer]
+          - button "Editar" [ref=e159] [cursor=pointer]
+          - button "Volver" [ref=e160] [cursor=pointer]
+      - article [ref=e161]:
+        - generic [ref=e162]:
+          - heading "Resumen del procedimiento" [level=3] [ref=e163]
+          - generic [ref=e164]: Documentado
+        - generic [ref=e165]:
+          - generic [ref=e166]:
+            - generic [ref=e167]: Creado por
+            - strong [ref=e168]: Operador JAF Tarapacá
+          - generic [ref=e169]:
+            - generic [ref=e170]: Estado pendiente
+            - strong [ref=e171]: Derivación a Carabineros
+          - generic [ref=e172]:
+            - generic [ref=e173]: JAF
+            - strong [ref=e174]: JAF Tarapacá
+          - generic [ref=e175]:
+            - generic [ref=e176]: Tipo de control
+            - strong [ref=e177]: Ingresando
+          - generic [ref=e178]:
+            - generic [ref=e179]: Fecha del procedimiento
+            - strong [ref=e180]: 25/05/2026 01:20
+          - generic [ref=e181]:
+            - generic [ref=e182]: Lugar
+            - strong [ref=e183]: Antofagasta
+        - generic [ref=e184]:
+          - heading "Observaciones iniciales" [level=4] [ref=e185]
+          - paragraph [ref=e186]: Al momento de realizar la fiscalizacion ofrecieron dolares para ingresar al País, el procediemiento fue grabado por la camara gopro portada por el Jefe de Patrulla
+      - article [ref=e187]:
+        - generic [ref=e188]:
+          - heading "Personas" [level=3] [ref=e189]
+          - generic [ref=e190]: 2 registro(s)
+        - table [ref=e192]:
+          - rowgroup [ref=e193]:
+            - row "Tipo Nombre Documento Nacionalidad Edad" [ref=e194]:
+              - columnheader "Tipo" [ref=e195]
+              - columnheader "Nombre" [ref=e196]
+              - columnheader "Documento" [ref=e197]
+              - columnheader "Nacionalidad" [ref=e198]
+              - columnheader "Edad" [ref=e199]
+          - rowgroup [ref=e200]:
+            - row "PRINCIPAL Eduardo Mamani Manani 12312324234 Bolivia 31" [ref=e201]:
+              - cell "PRINCIPAL" [ref=e202]
+              - cell "Eduardo Mamani Manani" [ref=e203]
+              - cell "12312324234" [ref=e204]
+              - cell "Bolivia" [ref=e205]
+              - cell "31" [ref=e206]
+            - row "MENOR Matias Mamani Quispe 423434546 Bolivia 17" [ref=e207]:
+              - cell "MENOR" [ref=e208]
+              - cell "Matias Mamani Quispe" [ref=e209]
+              - cell "423434546" [ref=e210]
+              - cell "Bolivia" [ref=e211]
+              - cell "17" [ref=e212]
+      - article [ref=e213]:
+        - generic [ref=e214]:
+          - heading "Evidencias cargadas" [level=3] [ref=e215]
+          - generic [ref=e216]: 4 archivo(s)
+        - table [ref=e218]:
+          - rowgroup [ref=e219]:
+            - row "Tipo Nombre Persona Tamaño Fecha" [ref=e220]:
+              - columnheader "Tipo" [ref=e221]
+              - columnheader "Nombre" [ref=e222]
+              - columnheader "Persona" [ref=e223]
+              - columnheader "Tamaño" [ref=e224]
+              - columnheader "Fecha" [ref=e225]
+              - columnheader [ref=e226]
+          - rowgroup [ref=e227]:
+            - row "Fotografía de persona Eduardo Mamani_cara.jpg - 56,283 bytes 25/05/2026 01:31 Ver evidencia Eduardo Mamani_cara.jpg Descargar" [ref=e228]:
+              - cell "Fotografía de persona" [ref=e229]
+              - cell "Eduardo Mamani_cara.jpg" [ref=e230]
+              - cell "-" [ref=e231]
+              - cell "56,283 bytes" [ref=e232]
+              - cell "25/05/2026 01:31" [ref=e233]
+              - cell "Ver evidencia Eduardo Mamani_cara.jpg Descargar" [ref=e234]:
+                - button "Ver evidencia Eduardo Mamani_cara.jpg" [ref=e235] [cursor=pointer]:
+                  - img [ref=e236]
+                - button "Descargar" [ref=e238] [cursor=pointer]
+            - row "Documento de identidad Eduardo Mamani.jpg - 51,017 bytes 25/05/2026 01:31 Ver evidencia Eduardo Mamani.jpg Descargar" [ref=e239]:
+              - cell "Documento de identidad" [ref=e240]
+              - cell "Eduardo Mamani.jpg" [ref=e241]
+              - cell "-" [ref=e242]
+              - cell "51,017 bytes" [ref=e243]
+              - cell "25/05/2026 01:31" [ref=e244]
+              - cell "Ver evidencia Eduardo Mamani.jpg Descargar" [ref=e245]:
+                - button "Ver evidencia Eduardo Mamani.jpg" [ref=e246] [cursor=pointer]:
+                  - img [ref=e247]
+                - button "Descargar" [ref=e249] [cursor=pointer]
+            - row "Fotografía de persona Matias mamani_ cara.jpg - 61,650 bytes 25/05/2026 01:31 Ver evidencia Matias mamani_ cara.jpg Descargar" [ref=e250]:
+              - cell "Fotografía de persona" [ref=e251]
+              - cell "Matias mamani_ cara.jpg" [ref=e252]
+              - cell "-" [ref=e253]
+              - cell "61,650 bytes" [ref=e254]
+              - cell "25/05/2026 01:31" [ref=e255]
+              - cell "Ver evidencia Matias mamani_ cara.jpg Descargar" [ref=e256]:
+                - button "Ver evidencia Matias mamani_ cara.jpg" [ref=e257] [cursor=pointer]:
+                  - img [ref=e258]
+                - button "Descargar" [ref=e260] [cursor=pointer]
+            - row "Documento de identidad Matias Mamani.jpeg - 7,394 bytes 25/05/2026 01:31 Ver evidencia Matias Mamani.jpeg Descargar" [ref=e261]:
+              - cell "Documento de identidad" [ref=e262]
+              - cell "Matias Mamani.jpeg" [ref=e263]
+              - cell "-" [ref=e264]
+              - cell "7,394 bytes" [ref=e265]
+              - cell "25/05/2026 01:31" [ref=e266]
+              - cell "Ver evidencia Matias Mamani.jpeg Descargar" [ref=e267]:
+                - button "Ver evidencia Matias Mamani.jpeg" [ref=e268] [cursor=pointer]:
+                  - img [ref=e269]
+                - button "Descargar" [ref=e271] [cursor=pointer]
+      - article [ref=e272]:
+        - generic [ref=e273]:
+          - generic [ref=e274]: Acción requerida
+          - strong [ref=e275]: Confirmar envío institucional
+        - button "Enviar a Carabineros" [ref=e276] [cursor=pointer]

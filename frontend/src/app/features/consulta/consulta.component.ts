@@ -8,36 +8,7 @@ import { Caso } from '../../core/models/caso.model';
   selector: 'app-consulta',
   standalone: true,
   imports: [CommonModule, RouterLink],
-  template: `
-    <div class="page-grid">
-      <article class="card table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Fecha</th>
-              <th>Estado</th>
-              <th>Lugar</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let caso of casos">
-              <td>{{ caso.codigo }}</td>
-              <td>{{ caso.fechaHoraProcedimiento | date: 'dd/MM/yyyy HH:mm' }}</td>
-              <td>{{ caso.estado }}</td>
-              <td>{{ caso.lugar }}</td>
-              <td>
-                <button class="btn-secondary" [routerLink]="['/casos', caso.id]">
-                  Ver detalle
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </article>
-    </div>
-  `,
+  templateUrl: './consulta.component.html',
 })
 export class ConsultaComponent implements OnInit {
   private readonly casosService = inject(CasosService);

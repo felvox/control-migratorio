@@ -1,8 +1,21 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Caso, DocumentoGenerado, Evidencia, EstadoCaso } from '../../core/models/caso.model';
+import {
+  Caso,
+  DocumentoGenerado,
+  Evidencia,
+  EstadoCaso,
+  PdiSituacionMigratoria,
+} from '../../core/models/caso.model';
 import { PaginatedResponse } from '../../core/models/paginated.model';
+
+export interface CerrarPdiPayload {
+  ordenJudicialVigente: boolean;
+  situacionMigratoria?: PdiSituacionMigratoria;
+  reconducible?: boolean;
+  observaciones?: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class CasosService {
@@ -40,11 +53,45 @@ export class CasosService {
     return this.http.patch(`${this.apiUrl}/casos/${id}/estado`, { estado });
   }
 
+  recepcionarEnCarabineros(id: string) {
+    return this.http.post<Caso>(`${this.apiUrl}/casos/${id}/recepcionar-carabineros`, {});
+  }
+
+  derivarDesdeCarabinerosAPdi(id: string) {
+    return this.http.post<Caso>(`${this.apiUrl}/casos/${id}/derivar-a-pdi`, {});
+  }
+
+  enviarDerivacionPendiente(id: string) {
+    return this.http.post<Caso>(`${this.apiUrl}/casos/${id}/enviar-derivacion`, {});
+  }
+
+  recepcionarEnPdi(id: string) {
+    return this.http.post<Caso>(`${this.apiUrl}/casos/${id}/recepcionar-pdi`, {});
+  }
+
+  cerrarEnPdi(id: string, payload: CerrarPdiPayload) {
+    return this.http.post<Caso>(`${this.apiUrl}/casos/${id}/cerrar-pdi`, payload);
+  }
+
+  agregarObservacionInstitucional(id: string, observacion: string) {
+    return this.http.post<{ id: string; observaciones: string | null }>(
+      `${this.apiUrl}/casos/${id}/observaciones/institucional`,
+      { observacion },
+    );
+  }
+
   subirEvidencia(casoId: string, formData: FormData) {
     return this.http.post<Evidencia>(
       `${this.apiUrl}/casos/${casoId}/evidencias`,
       formData,
     );
+  }
+
+  convertirWordAPdf(formData: FormData) {
+    return this.http.post(`${this.apiUrl}/evidencias/convertir-word-pdf`, formData, {
+      observe: 'response',
+      responseType: 'blob',
+    });
   }
 
   listarEvidencias(casoId: string) {
@@ -55,6 +102,10 @@ export class CasosService {
     return this.http.get(`${this.apiUrl}/evidencias/${id}/download`, {
       responseType: 'blob',
     });
+  }
+
+  eliminarEvidencia(id: string) {
+    return this.http.delete<{ id: string }>(`${this.apiUrl}/evidencias/${id}`);
   }
 
   generarActaPdf(casoId: string) {

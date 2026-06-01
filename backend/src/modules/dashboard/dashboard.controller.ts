@@ -17,4 +17,19 @@ export class DashboardController {
   obtenerResumen(@CurrentUser() user: AuthUser, @Query('fecha') fecha?: string) {
     return this.dashboardService.resumenAdministrador(user, fecha);
   }
+
+  @Get('monitoreo-master')
+  @Roles(Role.ADMINISTRADOR)
+  obtenerMonitoreoMaster(
+    @CurrentUser() user: AuthUser,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+    @Query('jaf') jaf?: string,
+  ) {
+    return this.dashboardService.resumenMonitoreoMaster(user, {
+      fechaDesde,
+      fechaHasta,
+      jaf,
+    });
+  }
 }

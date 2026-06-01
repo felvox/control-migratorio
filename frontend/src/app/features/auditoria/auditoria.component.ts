@@ -1,296 +1,396 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
-import { Jaf } from '../../core/models/auth.model';
-import { AuditoriaItem, AuditoriaService } from './auditoria.service';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { timer } from 'rxjs';
+import { Jaf, Rol } from '../../core/models/auth.model';
+import { TrazabilidadUiService } from '../../core/services/trazabilidad-ui.service';
+import {
+  AuditoriaItem,
+  AuditoriaService,
+  AuditoriaUsuarioFiltrable,
+  UsuarioConexionItem,
+  UsuariosConexionResponse,
+} from './auditoria.service';
 
-type FiltroModulo = 'TODOS' | 'CASOS' | 'USUARIOS';
-type FiltroAccion = 'TODAS' | 'ACCESOS' | 'CASO_CREA_EDITA' | 'PDF';
+interface AccionFiltro {
+  key: string;
+  label: string;
+  acciones?: string[];
+}
+
+const ACCIONES: AccionFiltro[] = [
+  { key: 'TODAS', label: 'Todas las acciones' },
+  { key: 'LOGIN', label: 'Inicio de sesión', acciones: ['LOGIN'] },
+  { key: 'LOGOUT', label: 'Cierre de sesión', acciones: ['LOGOUT'] },
+  { key: 'CREAR_CASO', label: 'Crear caso', acciones: ['CREAR_CASO'] },
+  { key: 'EDITAR_CASO', label: 'Editar caso', acciones: ['EDITAR_CASO'] },
+  {
+    key: 'DERIVAR',
+    label: 'Derivar caso',
+    acciones: ['ENVIAR_CASO_DERIVACION', 'DERIVAR_CASO_A_PDI'],
+  },
+  { key: 'CERRAR_CASO', label: 'Cerrar caso', acciones: ['CERRAR_CASO_PDI'] },
+  {
+    key: 'CARGAR_EVIDENCIA',
+    label: 'Cargar evidencia',
+    acciones: ['CARGAR_EVIDENCIA'],
+  },
+  {
+    key: 'ELIMINAR_EVIDENCIA',
+    label: 'Eliminar evidencia',
+    acciones: ['ELIMINAR_EVIDENCIA'],
+  },
+  { key: 'GENERAR_PDF', label: 'Generar PDF', acciones: ['GENERAR_PDF_ACTA'] },
+];
+
+const ROLES_USUARIO: Rol[] = [
+  'ADMINISTRADOR',
+  'OPERADOR',
+  'CONSULTA',
+  'AUDITOR',
+  'CARABINEROS',
+  'PDI',
+];
 
 @Component({
   selector: 'app-auditoria',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div class="page-grid">
-      <article class="card filtros-card">
-        <div class="filtros-grid">
-          <div>
-            <label>JAF</label>
-            <select [value]="filtroJaf" (change)="onJafChange($event)">
-              <option value="">Todas las JAF</option>
-              <option value="TARAPACA">JAF Tarapacá</option>
-              <option value="ANTOFAGASTA">JAF Antofagasta</option>
-              <option value="ARICA_PARINACOTA">JAF Arica y Parinacota</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="chips-block">
-          <label>Módulo</label>
-          <div class="chips-row">
-            <button
-              type="button"
-              class="chip-btn"
-              [class.chip-active]="filtroModulo === 'TODOS'"
-              (click)="seleccionarModulo('TODOS')"
-            >
-              Todos
-            </button>
-            <button
-              type="button"
-              class="chip-btn"
-              [class.chip-active]="filtroModulo === 'CASOS'"
-              (click)="seleccionarModulo('CASOS')"
-            >
-              Casos
-            </button>
-            <button
-              type="button"
-              class="chip-btn"
-              [class.chip-active]="filtroModulo === 'USUARIOS'"
-              (click)="seleccionarModulo('USUARIOS')"
-            >
-              Usuarios
-            </button>
-          </div>
-        </div>
-
-        <div class="chips-block">
-          <label>Acción</label>
-          <div class="chips-row">
-            <button
-              type="button"
-              class="chip-btn"
-              [class.chip-active]="filtroAccion === 'TODAS'"
-              (click)="seleccionarAccion('TODAS')"
-            >
-              Todas
-            </button>
-            <button
-              type="button"
-              class="chip-btn"
-              [class.chip-active]="filtroAccion === 'ACCESOS'"
-              (click)="seleccionarAccion('ACCESOS')"
-            >
-              Accesos (login/logout)
-            </button>
-            <button
-              type="button"
-              class="chip-btn"
-              [class.chip-active]="filtroAccion === 'CASO_CREA_EDITA'"
-              (click)="seleccionarAccion('CASO_CREA_EDITA')"
-            >
-              Crear/Editar caso
-            </button>
-            <button
-              type="button"
-              class="chip-btn"
-              [class.chip-active]="filtroAccion === 'PDF'"
-              (click)="seleccionarAccion('PDF')"
-            >
-              Generar/Descargar PDF
-            </button>
-
-            <button type="button" class="chip-btn chip-clear" (click)="limpiarFiltros()">
-              Limpiar filtros
-            </button>
-          </div>
-        </div>
-      </article>
-
-      <article class="card table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Acción</th>
-              <th>Módulo</th>
-              <th>Descripción</th>
-              <th>Usuario</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of items">
-              <td>{{ item.fechaHora | date: 'dd/MM/yyyy HH:mm' }}</td>
-              <td>{{ etiquetaAccion(item.accion) }}</td>
-              <td>{{ etiquetaModulo(item.entidad) }}</td>
-              <td>{{ item.descripcion || '-' }}</td>
-              <td>{{ item.usuario?.nombreCompleto || '-' }}</td>
-            </tr>
-            <tr *ngIf="!items.length">
-              <td colspan="5" class="empty-cell">No hay actividad para los filtros seleccionados.</td>
-            </tr>
-          </tbody>
-        </table>
-      </article>
-    </div>
-  `,
-  styles: [
-    `
-      .filtros-card {
-        display: grid;
-        gap: 0.8rem;
-      }
-
-      .filtros-grid {
-        display: grid;
-        grid-template-columns: minmax(240px, 360px);
-        gap: 0.8rem;
-      }
-
-      .chips-block {
-        display: grid;
-        gap: 0.45rem;
-      }
-
-      .chips-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-      }
-
-      .chip-btn {
-        border: 1px solid #c6d3e3;
-        background: #f7fbff;
-        color: #2b425b;
-        border-radius: 999px;
-        padding: 0.4rem 0.8rem;
-        font-size: 0.9rem;
-        font-weight: 600;
-      }
-
-      .chip-btn:hover {
-        background: #eef5ff;
-      }
-
-      .chip-btn.chip-active {
-        border-color: #2567bd;
-        background: #0f5e84;
-        color: #ffffff;
-      }
-
-      .chip-btn.chip-clear {
-        border-color: #cfd8e4;
-        background: #ffffff;
-        color: #425b75;
-      }
-
-      .empty-cell {
-        text-align: center;
-        color: #647a92;
-        padding: 1rem;
-      }
-    `,
-  ],
+  templateUrl: './auditoria.component.html',
+  styleUrl: './auditoria.component.css',
 })
 export class AuditoriaComponent implements OnInit {
   private readonly auditoriaService = inject(AuditoriaService);
+  private readonly trazabilidadUiService = inject(TrazabilidadUiService);
+  private readonly destroyRef = inject(DestroyRef);
 
   items: AuditoriaItem[] = [];
+  usuariosFiltrables: AuditoriaUsuarioFiltrable[] = [];
+  usuariosConexion: UsuarioConexionItem[] = [];
+  eventosSeguridad: AuditoriaItem[] = [];
+  filtroEventosSeguridad: 'PENDIENTES' | 'REVISADOS' = 'PENDIENTES';
+  modalUsuariosActivosAbierto = false;
+  modalEventosSeguridadAbierto = false;
+  cargandoSesionesActivas = false;
+  cargandoEventosSeguridad = false;
+  resumenSesiones: Pick<
+    UsuariosConexionResponse,
+    'ventanaActivaMinutos' | 'totalUsuarios' | 'totalActivos' | 'totalDesconectados'
+  > = {
+    ventanaActivaMinutos: 5,
+    totalUsuarios: 0,
+    totalActivos: 0,
+    totalDesconectados: 0,
+  };
+  filtroEstadoConexion: 'ACTIVOS' | 'DESCONECTADOS' = 'ACTIVOS';
+
+  readonly roles = ROLES_USUARIO;
+  readonly acciones = ACCIONES;
+
   filtroJaf: Jaf | '' = '';
-  filtroModulo: FiltroModulo = 'TODOS';
-  filtroAccion: FiltroAccion = 'TODAS';
+  filtroRol: Rol | '' = '';
+  filtroUsuarioId = '';
+  filtroAccionKey = 'TODAS';
 
   ngOnInit(): void {
+    this.trazabilidadUiService.abrirUsuariosActivos$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((estado) => this.abrirModalUsuariosActivos(estado));
+    this.trazabilidadUiService.verEventosSeguridad$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.abrirModalEventosSeguridad());
+
+    timer(0, 30000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.cargarEventosSeguridadPendientes());
+
+    this.cargarUsuariosFiltrables();
     this.buscar();
+  }
+
+  get accionSeleccionada(): AccionFiltro {
+    return this.acciones.find((accion) => accion.key === this.filtroAccionKey) ?? this.acciones[0]!;
   }
 
   onJafChange(event: Event): void {
     const target = event.target as HTMLSelectElement;
-    const value = target.value as Jaf | '';
-    this.filtroJaf = value;
+    this.filtroJaf = (target.value as Jaf | '') ?? '';
+    this.filtroUsuarioId = '';
+    this.cargarUsuariosFiltrables();
     this.buscar();
+    this.recargarSesionesActivasSiModalAbierto();
   }
 
-  seleccionarModulo(modulo: FiltroModulo): void {
-    if (this.filtroModulo === modulo) {
-      return;
-    }
-    this.filtroModulo = modulo;
+  onRolChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.filtroRol = (target.value as Rol | '') ?? '';
+    this.filtroUsuarioId = '';
+    this.cargarUsuariosFiltrables();
     this.buscar();
+    this.recargarSesionesActivasSiModalAbierto();
   }
 
-  seleccionarAccion(accion: FiltroAccion): void {
-    if (this.filtroAccion === accion) {
-      return;
-    }
-    this.filtroAccion = accion;
+  onUsuarioChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.filtroUsuarioId = target.value ?? '';
+    this.buscar();
+    this.recargarSesionesActivasSiModalAbierto();
+  }
+
+  onAccionChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.filtroAccionKey = target.value || 'TODAS';
     this.buscar();
   }
 
   limpiarFiltros(): void {
     this.filtroJaf = '';
-    this.filtroModulo = 'TODOS';
-    this.filtroAccion = 'TODAS';
+    this.filtroRol = '';
+    this.filtroUsuarioId = '';
+    this.filtroAccionKey = 'TODAS';
+    this.cargarUsuariosFiltrables();
     this.buscar();
+    this.recargarSesionesActivasSiModalAbierto();
   }
 
   buscar(): void {
     this.auditoriaService
       .listar({
         jaf: this.filtroJaf || undefined,
-        entidades: this.entidadesPorModulo(this.filtroModulo),
-        acciones: this.accionesPorFiltro(this.filtroAccion),
+        rol: this.filtroRol || undefined,
+        usuarioId: this.filtroUsuarioId || undefined,
+        acciones: this.accionSeleccionada.acciones,
       })
       .subscribe((response) => {
         this.items = response.items;
       });
   }
 
-  etiquetaModulo(entidad: string): string {
-    if (entidad === 'CASO') {
-      return 'Casos';
+  etiquetaRol(rol: Rol): string {
+    if (rol === 'ADMINISTRADOR') {
+      return 'Administrador';
     }
-    if (entidad === 'USUARIO') {
-      return 'Usuarios';
+    if (rol === 'OPERADOR') {
+      return 'Operador';
     }
-    if (entidad === 'AUTH') {
-      return 'Autenticación';
+    if (rol === 'CONSULTA') {
+      return 'Consulta';
     }
-    if (entidad === 'DOCUMENTO') {
-      return 'Documentos';
+    if (rol === 'AUDITOR') {
+      return 'Auditor';
     }
-    if (entidad === 'EVIDENCIA') {
-      return 'Evidencias';
+    if (rol === 'CARABINEROS') {
+      return 'Carabineros';
     }
-    if (entidad === 'REPORTE') {
-      return 'Reportes';
-    }
-    return entidad;
+    return 'PDI';
   }
 
-  etiquetaAccion(accion: string): string {
-    const mapa: Record<string, string> = {
-      LOGIN: 'Inicio de sesión',
-      LOGOUT: 'Cierre de sesión',
-      CREAR_CASO: 'Crear caso',
-      EDITAR_CASO: 'Editar caso',
-      GENERAR_PDF_ACTA: 'Generar PDF',
-      DESCARGAR_DOCUMENTO: 'Descargar PDF',
-    };
-    return mapa[accion] ?? accion;
+  etiquetaJaf(jaf: Jaf | null): string {
+    if (!jaf) {
+      return '-';
+    }
+    if (jaf === 'TARAPACA') {
+      return 'JAF Tarapacá';
+    }
+    if (jaf === 'ANTOFAGASTA') {
+      return 'JAF Antofagasta';
+    }
+    return 'JAF Arica y Parinacota';
   }
 
-  private entidadesPorModulo(modulo: FiltroModulo): string[] | undefined {
-    if (modulo === 'CASOS') {
-      return ['CASO'];
+  etiquetaUsuarioFiltro(usuario: AuditoriaUsuarioFiltrable): string {
+    if (usuario.esMaster) {
+      return `${usuario.nombreCompleto} · Administrador Master`;
     }
-    if (modulo === 'USUARIOS') {
-      return ['USUARIO'];
-    }
-    return undefined;
+
+    return `${usuario.nombreCompleto} · ${this.etiquetaRol(usuario.rol)}`;
   }
 
-  private accionesPorFiltro(accion: FiltroAccion): string[] | undefined {
-    if (accion === 'ACCESOS') {
-      return ['LOGIN', 'LOGOUT'];
+  descripcionVisible(item: AuditoriaItem): string {
+    const descripcion = item.descripcion?.trim() || '-';
+    if (item.accion !== 'CREAR_CASO') {
+      return descripcion;
     }
-    if (accion === 'CASO_CREA_EDITA') {
-      return ['CREAR_CASO', 'EDITAR_CASO'];
-    }
-    if (accion === 'PDF') {
-      return ['GENERAR_PDF_ACTA', 'DESCARGAR_DOCUMENTO'];
-    }
-    return undefined;
+
+    return descripcion.replace(/\s+creado$/i, '').trim();
   }
+
+  personaInvolucrada(item: AuditoriaItem): string {
+    const personas = item.caso?.personas ?? [];
+    if (!personas.length) {
+      return '-';
+    }
+
+    const principal = personas.find((persona) => persona.tipoPersona === 'PRINCIPAL') ?? personas[0]!;
+    const nombreCompleto = `${principal.nombres} ${principal.apellidos}`.trim();
+
+    if (!nombreCompleto) {
+      return principal.edad >= 18 ? 'Mayor de edad' : 'Menor de edad';
+    }
+
+    return principal.edad >= 18
+      ? `${nombreCompleto} (Mayor de edad)`
+      : `${nombreCompleto} (Menor de edad)`;
+  }
+
+  etiquetaEstadoSesion(estado: UsuarioConexionItem['estadoConexion']): string {
+    return estado === 'ACTIVO' ? 'Activo' : 'Desconectado';
+  }
+
+  etiquetaAccionSeguridad(accion: string): string {
+    if (accion === 'LOGIN_FALLIDO') {
+      return 'Inicio de sesión fallido';
+    }
+    if (accion === 'LOGIN_BLOQUEADO_TEMPORAL') {
+      return 'Bloqueo temporal de acceso';
+    }
+    if (accion === 'LOGIN_IP_NUEVA') {
+      return 'Acceso desde IP no reconocida';
+    }
+    return accion;
+  }
+
+  ipVisible(ip: string | null | undefined): string {
+    if (!ip) {
+      return '-';
+    }
+
+    if (ip === '::1') {
+      return '127.0.0.1';
+    }
+
+    if (ip.startsWith('::ffff:')) {
+      return ip.slice(7);
+    }
+
+    return ip;
+  }
+
+  abrirModalUsuariosActivos(estado: 'ACTIVOS' | 'DESCONECTADOS'): void {
+    this.filtroEstadoConexion = estado;
+    this.modalUsuariosActivosAbierto = true;
+    this.cargarSesionesActivas();
+  }
+
+  cerrarModalUsuariosActivos(): void {
+    this.modalUsuariosActivosAbierto = false;
+  }
+
+  recargarSesionesActivas(): void {
+    this.cargarSesionesActivas();
+  }
+
+  abrirModalEventosSeguridad(): void {
+    this.filtroEventosSeguridad = 'PENDIENTES';
+    this.modalEventosSeguridadAbierto = true;
+    this.cargarEventosSeguridad();
+  }
+
+  cerrarModalEventosSeguridad(): void {
+    this.modalEventosSeguridadAbierto = false;
+  }
+
+  recargarEventosSeguridad(): void {
+    this.cargarEventosSeguridad();
+  }
+
+  cambiarFiltroEventosSeguridad(estado: 'PENDIENTES' | 'REVISADOS'): void {
+    if (this.filtroEventosSeguridad === estado) {
+      return;
+    }
+
+    this.filtroEventosSeguridad = estado;
+    this.cargarEventosSeguridad();
+  }
+
+  marcarPendientesComoRevisados(): void {
+    if (this.cargandoEventosSeguridad || !this.eventosSeguridad.length) {
+      return;
+    }
+
+    this.auditoriaService.marcarEventosSeguridadRevisados().subscribe({
+      next: () => {
+        this.filtroEventosSeguridad = 'REVISADOS';
+        this.cargarEventosSeguridad();
+        this.cargarEventosSeguridadPendientes();
+      },
+      error: () => {
+        this.cargarEventosSeguridadPendientes();
+      },
+    });
+  }
+
+  private cargarUsuariosFiltrables(): void {
+    this.auditoriaService
+      .listarUsuariosFiltrables({
+        jaf: this.filtroJaf || undefined,
+        rol: this.filtroRol || undefined,
+      })
+      .subscribe((usuarios) => {
+        this.usuariosFiltrables = usuarios;
+      });
+  }
+
+  private cargarSesionesActivas(): void {
+    this.cargandoSesionesActivas = true;
+    this.auditoriaService
+      .listarUsuariosConexion({
+        estadoConexion: this.filtroEstadoConexion,
+      })
+      .subscribe({
+        next: (response) => {
+          this.usuariosConexion = response.items;
+          this.resumenSesiones = {
+            ventanaActivaMinutos: response.ventanaActivaMinutos,
+            totalUsuarios: response.totalUsuarios,
+            totalActivos: response.totalActivos,
+            totalDesconectados: response.totalDesconectados,
+          };
+          this.cargandoSesionesActivas = false;
+        },
+        error: () => {
+          this.usuariosConexion = [];
+          this.cargandoSesionesActivas = false;
+        },
+      });
+  }
+
+  private recargarSesionesActivasSiModalAbierto(): void {
+    if (!this.modalUsuariosActivosAbierto) {
+      return;
+    }
+
+    this.cargarSesionesActivas();
+  }
+
+  private cargarEventosSeguridad(): void {
+    this.cargandoEventosSeguridad = true;
+    this.auditoriaService
+      .listarEventosSeguridadPendientes(this.filtroEventosSeguridad)
+      .subscribe({
+      next: (items) => {
+        this.eventosSeguridad = items ?? [];
+        this.cargandoEventosSeguridad = false;
+      },
+      error: () => {
+        this.eventosSeguridad = [];
+        this.cargandoEventosSeguridad = false;
+        this.cargarEventosSeguridadPendientes();
+      },
+    });
+  }
+
+  private cargarEventosSeguridadPendientes(): void {
+    this.auditoriaService.obtenerEventosSeguridadPendientes().subscribe({
+      next: (response) => {
+        this.trazabilidadUiService.actualizarEventosSeguridadPendientes(
+          response.totalPendientes ?? 0,
+        );
+      },
+      error: () => {
+        this.trazabilidadUiService.actualizarEventosSeguridadPendientes(0);
+      },
+    });
+  }
+
 }
